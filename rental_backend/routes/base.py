@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
 from rental_backend import __version__
 from rental_backend.settings import get_settings
-
+from rental_backend.routes.item_type import item_type
 settings = get_settings()
 app = FastAPI(
     title='Сервис цифрового проката',
@@ -30,3 +30,4 @@ app.add_middleware(
     allow_methods=settings.CORS_ALLOW_METHODS,
     allow_headers=settings.CORS_ALLOW_HEADERS,
 )
+app.include_router(item_type)

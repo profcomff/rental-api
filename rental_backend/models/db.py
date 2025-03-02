@@ -21,10 +21,11 @@ class Item(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"))
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
+    type: Mapped[ItemType] = relationship("ItemType", back_populates="items")
 
 class ItemType(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String, nulllable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String, nullable = True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     items: Mapped[list[Item]] = relationship("Item", back_populates="type")
