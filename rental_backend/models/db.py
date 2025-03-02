@@ -6,6 +6,7 @@ import uuid
 from enum import Enum
 
 from fastapi_sqlalchemy import db
+<<<<<<< HEAD
 from sqlalchemy import JSON, UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func, nulls_last, or_, true
@@ -13,6 +14,11 @@ from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
+=======
+from sqlalchemy import Boolean, DateTime
+from sqlalchemy import ForeignKey, Integer, String, JSON
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+>>>>>>> d64a453bfc92a67217407e9f5216848f0ed3802b
 from .base import BaseDbModel
 
 
