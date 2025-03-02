@@ -20,6 +20,8 @@ class RentStatus(str, Enum):
     RESERVED: str = "reserved"
     ACTIVE: str = "active"
     CANCELED: str = "canceled"
+    OVERDUE: str = "overdue"
+    RETURNED: str = "returned"
     DISMISSED: str = "dismissed"
 
 
@@ -42,7 +44,7 @@ class RentalSession(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer)
     item_id: Mapped[int] = mapped_column(Integer, ForeignKey("item.id"))
-    admin_open_id: Mapped[int] = mapped_column(Integer)
+    admin_open_id: Mapped[int] = mapped_column(Integer, nullable=True)
     admin_close_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reservation_ts: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.utcnow, nullable=False

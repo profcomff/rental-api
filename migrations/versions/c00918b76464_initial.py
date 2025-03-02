@@ -49,7 +49,7 @@ def upgrade():
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('item_id', sa.Integer(), nullable=False),
-        sa.Column('admin_open_id', sa.Integer(), nullable=False),
+        sa.Column('admin_open_id', sa.Integer(), nullable=True),
         sa.Column('admin_close_id', sa.Integer(), nullable=True),
         sa.Column('reservation_ts', sa.DateTime(), nullable=False),
         sa.Column('start_ts', sa.DateTime(), nullable=True),
