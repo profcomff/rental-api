@@ -2,8 +2,8 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
-from rental-backend.models.base import Base
-from rental-backend.settings import get_settings
+from rental_backend.models.base import Base
+from rental_backend.settings import get_settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

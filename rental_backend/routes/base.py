@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
-from rental-backend import __version__
-from rental-backend.settings import get_settings
+from rental_backend import __version__
+from rental_backend.settings import get_settings
 
 settings = get_settings()
 app = FastAPI(
