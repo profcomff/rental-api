@@ -6,19 +6,15 @@ import uuid
 from enum import Enum
 
 from fastapi_sqlalchemy import db
-<<<<<<< HEAD
 from sqlalchemy import JSON, UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func, nulls_last, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
-
-=======
 from sqlalchemy import Boolean, DateTime
 from sqlalchemy import ForeignKey, Integer, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
->>>>>>> d64a453bfc92a67217407e9f5216848f0ed3802b
 from .base import BaseDbModel
 
 
@@ -33,6 +29,10 @@ class Item(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"))
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
+    type: Mapped["ItemType"] = relationship(
+        "ItemType",
+        back_populates="items"
+    )
 
 
 class ItemType(BaseDbModel):
