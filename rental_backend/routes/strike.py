@@ -11,10 +11,10 @@ from rental_backend.schemas.models import StrikeGet, StrikePost
 from rental_backend.utils.action import ActionLogger
 
 
-router = APIRouter(prefix="/strike", tags=["Strike"])
+strike = APIRouter(prefix="/strike", tags=["Strike"])
 
 
-@router.post("", response_model=StrikeGet)
+@strike.post("", response_model=StrikeGet)
 async def create_strike(
     strike_info: StrikePost, user=Depends(UnionAuth(scopes=["rental.strike.create"], allow_none=False))
 ) -> StrikeGet:
@@ -29,13 +29,13 @@ async def create_strike(
     return StrikeGet.model_validate(new_strike)
 
 
-@router.get("/user/{user_id}", response_model=list[StrikeGet])
+@strike.get("/user/{user_id}", response_model=list[StrikeGet])
 async def get_user_strikes(user_id: int) -> list[StrikeGet]:
     strikes = Strike.query(session=db.session).filter(Strike.user_id == user_id).all()
     return [StrikeGet.model_validate(strike) for strike in strikes]
 
 
-@router.get("", response_model=list[StrikeGet])
+@strike.get("", response_model=list[StrikeGet])
 async def get_strikes(
     user_id: Optional[int] = Query(None),
     admin_id: Optional[int] = Query(None),
@@ -60,7 +60,7 @@ async def get_strikes(
     return [StrikeGet.model_validate(strike) for strike in strikes]
 
 
-@router.delete("/{id}")
+@strike.delete("/{id}")
 async def delete_strike(id: int, user=Depends(UnionAuth(scopes=["rental.strike.delete"], allow_none=False))) -> dict:
     strike = Strike.get(id, session=db.session)
     if strike is None:

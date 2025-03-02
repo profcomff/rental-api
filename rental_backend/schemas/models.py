@@ -9,18 +9,14 @@ from rental_backend.schemas.base import Base
 class ItemTypeGet(Base):
     id: int
     name: str
-    image_url: str | None
-    description: str | None
-
-
-class ItemTypeGetAll(Base):
-    item_types: list[ItemTypeGet]
+    image_url: str | None = None
+    description: str | None = None
 
 
 class ItemTypePost(Base):
     name: str
-    image_url: str | None
-    description: str | None
+    image_url: str | None = None
+    description: str | None = None
 
 
 class ItemGet(Base):
