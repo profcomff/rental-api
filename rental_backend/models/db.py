@@ -12,9 +12,7 @@ from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func,
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
-from sqlalchemy import Boolean, DateTime
-from sqlalchemy import ForeignKey, Integer, String, JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from .base import BaseDbModel
 
 
@@ -29,10 +27,7 @@ class Item(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"))
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
-    type: Mapped["ItemType"] = relationship(
-        "ItemType",
-        back_populates="items"
-    )
+    type: Mapped["ItemType"] = relationship("ItemType", back_populates="items")
 
 
 class ItemType(BaseDbModel):
@@ -55,22 +50,23 @@ class RentalSession(BaseDbModel):
     start_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     end_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     actual_return_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
-    status: Mapped[RentStatus] = mapped_column(String)
+    status: Mapped[RentStatus] = mapped_column(String, nullable=False)
 
 
 class Event(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    user_id: Mapped[int] = mapped_column(Integer)
-    admin_id: Mapped[int] = mapped_column(Integer)
-    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("rental_session.id"))
-    action_type: Mapped[str] = mapped_column(String)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    admin_id: Mapped[int] = mapped_column(Integer, nullable=True)
+    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("rental_session.id"), nullable=True)
+    action_type: Mapped[str] = mapped_column(String, nullable=False)
     details: Mapped[dict] = mapped_column(JSON, nullable=True)
-    create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
+    create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
 
 class Strike(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer)
+    session_id: Mapped[int] = mapped_column(Integer, ForeignKey("rental_session.id"), nullable=True)
     admin_id: Mapped[int] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(String)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime)

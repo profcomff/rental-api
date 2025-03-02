@@ -1,7 +1,7 @@
 import starlette.requests
 from starlette.responses import JSONResponse
 
-from rental_backend.exceptions import AlreadyExists, ObjectNotFound
+from rental_backend.exceptions import AlreadyExists, DateRangeError, ObjectNotFound
 from rental_backend.schemas.base import StatusResponseModel
 
 from .base import app
@@ -18,4 +18,11 @@ async def not_found_handler(req: starlette.requests.Request, exc: ObjectNotFound
 async def already_exists_handler(req: starlette.requests.Request, exc: AlreadyExists):
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=409
+    )
+
+
+@app.exception_handler(DateRangeError)
+async def date_range_error_handler(req: starlette.requests.Request, exc: DateRangeError):
+    return JSONResponse(
+        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=400
     )

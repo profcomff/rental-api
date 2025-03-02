@@ -1,16 +1,16 @@
 """initial
 
-Revision ID: c8ef6c37ea9e
+Revision ID: c00918b76464
 Revises: 
-Create Date: 2025-03-02 15:17:14.558329
+Create Date: 2025-03-02 15:44:18.126632
 
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision = 'c8ef6c37ea9e'
+revision = 'c00918b76464'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -67,9 +67,9 @@ def upgrade():
     op.create_table(
         'event',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('admin_id', sa.Integer(), nullable=False),
-        sa.Column('session_id', sa.Integer(), nullable=False),
+        sa.Column('user_id', sa.Integer(), nullable=True),
+        sa.Column('admin_id', sa.Integer(), nullable=True),
+        sa.Column('session_id', sa.Integer(), nullable=True),
         sa.Column('action_type', sa.String(), nullable=False),
         sa.Column('details', sa.JSON(), nullable=True),
         sa.Column('create_ts', sa.DateTime(), nullable=False),

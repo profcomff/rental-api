@@ -30,3 +30,11 @@ class AlreadyExists(RentalApiError):
 class ForbiddenAction(RentalApiError):
     def __init__(self, type: Type):
         super().__init__(f"Forbidden action with {type.__name__}", f"Запрещенное действие с объектом {type.__name__}")
+
+
+class DateRangeError(RentalApiError):
+    def __init__(self):
+        super().__init__(
+            "Both 'from_date' and 'to_date' must be provided together",
+            "Оба параметра 'from_date' и 'to_date' должны быть переданы вместе",
+        )

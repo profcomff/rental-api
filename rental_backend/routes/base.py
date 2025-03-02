@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
 
 from rental_backend import __version__
-from rental_backend.settings import get_settings
 from rental_backend.routes.event import event
 from rental_backend.routes.item import item
-
 from rental_backend.routes.item_type import item_type
+from rental_backend.settings import get_settings
+
+
 settings = get_settings()
 app = FastAPI(
     title='Сервис цифрового проката',
