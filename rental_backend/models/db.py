@@ -6,15 +6,9 @@ import uuid
 from enum import Enum
 
 from fastapi_sqlalchemy import db
-from sqlalchemy import UUID, Boolean, DateTime
-from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, JSON, UnaryExpression, and_, func, nulls_last, or_, true
-from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
+from sqlalchemy import Boolean, DateTime
+from sqlalchemy import ForeignKey, Integer, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.orm.attributes import InstrumentedAttribute
-
-from rating_api.utils.mark import calc_weighted_mark
-
 from .base import BaseDbModel
 
 class RentStatus(str, Enum):
