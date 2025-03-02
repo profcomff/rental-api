@@ -38,3 +38,10 @@ class DateRangeError(RentalApiError):
             "Both 'from_date' and 'to_date' must be provided together",
             "Оба параметра 'from_date' и 'to_date' должны быть переданы вместе",
         )
+
+class NoneAvailable(RentalApiError):
+    def __init__(self, obj: type, obj_id_or_name: int | str):
+        super().__init__(
+            f"The is no items of type {obj_id_or_name=} available at the moment",
+            f"В данный момент нет доступных предметов с идентификатором {obj_id_or_name=}",
+        )

@@ -5,6 +5,7 @@ from fastapi_sqlalchemy import DBSessionMiddleware
 from rental_backend import __version__
 from rental_backend.routes.event import event
 from rental_backend.routes.item import item
+from rental_backend.routes.rental_session import rental_session
 from rental_backend.routes.item_type import item_type
 from rental_backend.settings import get_settings
 
@@ -37,5 +38,5 @@ app.add_middleware(
 
 app.include_router(event)
 app.include_router(item)
-
+app.include_router(rental_session)
 app.include_router(item_type)
