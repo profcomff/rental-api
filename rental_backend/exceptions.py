@@ -27,8 +27,6 @@ class AlreadyExists(RentalApiError):
         )
 
 
-
 class ForbiddenAction(RentalApiError):
     def __init__(self, type: Type):
         super().__init__(f"Forbidden action with {type.__name__}", f"Запрещенное действие с объектом {type.__name__}")
-
