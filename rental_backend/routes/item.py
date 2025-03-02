@@ -10,6 +10,7 @@ from fastapi_sqlalchemy import db
 from rental_backend import settings
 from rental_backend.exceptions import ObjectNotFound
 from rental_backend.models.db import Item, ItemType
+from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemGet, ItemPost
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
@@ -20,14 +21,17 @@ item = APIRouter(prefix="/item", tags=["Item"])
 
 
 @item.get("/item", response_model=list[ItemGet])
-async def get_items(user=Depends(UnionAuth())) -> list[Item]:
-    items = Item.query(session=db.session).all()
+async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
+    query = Item.query(session=db.session)
+    if type_id is not None:
+        query = query.filter(Item.type_id == type_id)
+    items = query.all()
     return [ItemGet.model_validate(item) for item in items]
 
 
 @item.post("/item", response_model=ItemGet)
 async def create_item(item: ItemPost, user=Depends(UnionAuth())) -> ItemGet:
-    item_type = ItemType.query(session=db.session).filter(ItemType.id == item.type_id).one_or_none()
+    item_type = ItemType.get(item.type_id, session=db.session)
     if item_type is None:
         raise ObjectNotFound(ItemType, item.type_id)
     new_item = Item.create(session=db.session, **item.model_dump())
@@ -55,3 +59,21 @@ async def update_item(id: int, is_available: bool, user=Depends(UnionAuth())) ->
         )
         return ItemGet.model_validate(item)
     raise ObjectNotFound(Item, id)
+
+
+@item.delete("/item/{id}", response_model=StatusResponseModel)
+async def delete_item(
+    id: int, user=Depends(UnionAuth(scopes=["rental.item.delete"], allow_none=False))
+) -> StatusResponseModel:
+    item = Item.get(id, session=db.session)
+    if item is None:
+        raise ObjectNotFound(Item, id)
+    Item.delete(id, session=db.session)
+    ActionLogger.log_event(
+        user_id=None,
+        admin_id=user.get('id'),
+        session_id=None,
+        action_type="DELETE_ITEM",
+        details={"id": id},
+    )
+    return StatusResponseModel(status="success", message="Item успешно удален", ru="Предмет успешно удален")
