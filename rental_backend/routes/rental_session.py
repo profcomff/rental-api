@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 
 from auth_lib.fastapi import UnionAuth
@@ -8,17 +9,21 @@ from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvai
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.routes.strike import create_strike
 from rental_backend.schemas.models import RentalSessionGet, RentStatus, StrikePost
-from rental_backend.utils.background_tasks import check_session_expiration
 
 
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
 
 
+RENTAL_SESSION_EXPIRY = datetime.timedelta(minutes=10)
+
+
 @rental_session.post("/{item_type_id}", response_model=RentalSessionGet)
-async def create_rental_session(item_type_id, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
-    available_items = Item.query(session=db.session).filter(Item.type_id == item_type_id and Item.is_available).all()
+async def create_rental_session(item_type_id, user=Depends(UnionAuth())):
+    available_items = (
+        Item.query(session=db.session).filter(Item.type_id == item_type_id, Item.is_available == True).all()
+    )
     if not available_items:
-        raise NoneAvailable
+        raise NoneAvailable(ItemType, item_type_id)
     session = RentalSession.create(
         session=db.session,
         user_id=user.get("id"),
@@ -27,7 +32,6 @@ async def create_rental_session(item_type_id, background_tasks: BackgroundTasks,
         status=RentStatus.RESERVED,
     )
     Item.update(session=db.session, id=available_items[0].id, is_available=False)
-    background_tasks.add_task(check_session_expiration)
     return RentalSessionGet.model_validate(session)
 
 
