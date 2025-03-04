@@ -46,7 +46,9 @@ async def create_item(item: ItemPost, user=Depends(UnionAuth())) -> ItemGet:
 
 
 @item.patch("/item/{id}", response_model=ItemGet)
-async def update_item(id: int, is_available: bool, user=Depends(UnionAuth())) -> ItemGet:
+async def update_item(
+    id: int, is_available: bool = Query(False, description="Флаг доступен ли предмет"), user=Depends(UnionAuth())
+) -> ItemGet:
     item = Item.query(session=db.session).filter(Item.id == id).one_or_none()
     if item is not None:
         item.is_available = is_available
