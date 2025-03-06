@@ -26,4 +26,16 @@ async def get_events(
     if session_id is not None:
         query = query.filter(Event.session_id == session_id)
     events = query.all()
-    return [EventGet.model_validate(event) for event in events]
+    result = [
+        EventGet(
+            id=event.id,
+            user_id=event.user_id,
+            admin_id=event.admin_id,
+            session_id=event.session_id,
+            action_type=event.action_type,
+            details=dict(event.details),
+            create_ts=event.create_ts,
+        )
+        for event in events
+    ]
+    return result
