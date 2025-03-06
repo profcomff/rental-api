@@ -9,3 +9,4 @@ pydantic[dotenv]
 pydantic-settings
 SQLAlchemy
 uvicorn
+aiohttp
