@@ -76,3 +76,10 @@ class RentalSessionGet(Base):
     end_ts: datetime.datetime | None
     actual_return_ts: datetime.datetime | None
     status: RentStatus
+
+
+class RentalSessionPatch(BaseModel):
+    status: Optional[RentStatus] = None
+    end_ts: Optional[datetime.datetime] = None
+    actual_return_ts: Optional[datetime.datetime] = None
+    admin_close_id: Optional[int] = None
