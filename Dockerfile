@@ -1,7 +1,7 @@
 FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
-ENV APP_NAME=rental-backend
+ENV APP_NAME=rental
 ENV APP_MODULE=${APP_NAME}.routes.base:app
 
 COPY ./requirements.txt /app/
