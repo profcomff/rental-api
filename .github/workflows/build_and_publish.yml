@@ -81,7 +81,7 @@ jobs:
             --restart on-failure:3 \
             --network=web \
             --env DB_DSN='${{ secrets.DB_DSN }}' \
-            --env ROOT_PATH='/rental_backend' \
+            --env ROOT_PATH='/rental' \
             --env AUTH_URL='https://api.test.profcomff.com/auth' \
             --env GUNICORN_CMD_ARGS='--log-config logging_test.conf' \
             --name ${{ env.CONTAINER_NAME }} \
@@ -121,7 +121,7 @@ jobs:
             --restart always \
             --network=web \
             --env DB_DSN='${{ secrets.DB_DSN }}' \
-            --env ROOT_PATH='/rental_backend' \
+            --env ROOT_PATH='/rental' \
             --env AUTH_URL='https://api.profcomff.com/auth' \
             --env GUNICORN_CMD_ARGS='--log-config logging_prod.conf' \
             --name ${{ env.CONTAINER_NAME }} \
