@@ -52,10 +52,10 @@ jobs:
     needs: build-and-push-image
     runs-on: [self-hosted, Linux, testing]
     environment:
-      name: Testing
-      url: https://api.test.profcomff.com/?urls.primaryName=rental-backend
+      name: Test
+      url: https://api.test.profcomff.com/?urls.primaryName=rental
     env:
-      CONTAINER_NAME: com_profcomff_api_rental-backend_test
+      CONTAINER_NAME: com_profcomff_api_rental_test
     permissions:
       packages: read
     steps:
@@ -81,7 +81,7 @@ jobs:
             --restart on-failure:3 \
             --network=web \
             --env DB_DSN='${{ secrets.DB_DSN }}' \
-            --env ROOT_PATH='/rental-backend' \
+            --env ROOT_PATH='/rental_backend' \
             --env AUTH_URL='https://api.test.profcomff.com/auth' \
             --env GUNICORN_CMD_ARGS='--log-config logging_test.conf' \
             --name ${{ env.CONTAINER_NAME }} \
@@ -94,9 +94,9 @@ jobs:
     runs-on: [self-hosted, Linux, production]
     environment:
       name: Production
-      url: https://api.profcomff.com/?urls.primaryName=rental-backend
+      url: https://api.profcomff.com/?urls.primaryName=rental
     env:
-      CONTAINER_NAME: com_profcomff_api_rental-backend
+      CONTAINER_NAME: com_profcomff_api_rental
     permissions:
       packages: read
     steps:
@@ -121,7 +121,7 @@ jobs:
             --restart always \
             --network=web \
             --env DB_DSN='${{ secrets.DB_DSN }}' \
-            --env ROOT_PATH='/rental-backend' \
+            --env ROOT_PATH='/rental_backend' \
             --env AUTH_URL='https://api.profcomff.com/auth' \
             --env GUNICORN_CMD_ARGS='--log-config logging_prod.conf' \
             --name ${{ env.CONTAINER_NAME }} \
