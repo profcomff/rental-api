@@ -9,10 +9,10 @@ from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvai
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.routes.strike import create_strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
+from rental_backend.utils.action import ActionLogger
 
 
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
-
 
 RENTAL_SESSION_EXPIRY = datetime.timedelta(minutes=10)
 
@@ -28,6 +28,13 @@ async def check_session_expiration(session_id: int):
             status=RentStatus.CANCELED,
         )
         Item.update(session=db.session, id=session.item_id, is_available=True)
+        ActionLogger.log_event(
+            user_id=session.user_id,
+            admin_id=None,
+            session_id=session.id,
+            action_type="EXPIRE_SESSION",
+            details={"status": RentStatus.CANCELED},
+        )
 
 
 @rental_session.post("/{item_type_id}", response_model=RentalSessionGet)
@@ -48,6 +55,14 @@ async def create_rental_session(item_type_id, background_tasks: BackgroundTasks,
 
     background_tasks.add_task(check_session_expiration, session.id)
 
+    ActionLogger.log_event(
+        user_id=user.get("id"),
+        admin_id=None,
+        session_id=session.id,
+        action_type="CREATE_SESSION",
+        details={"item_id": session.item_id, "status": RentStatus.RESERVED},
+    )
+
     return RentalSessionGet.model_validate(session)
 
 
@@ -56,15 +71,23 @@ async def start_rental_session(session_id, user=Depends(UnionAuth(scopes=["renta
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
-    return RentalSessionGet.model_validate(
-        RentalSession.update(
-            session=db.session,
-            id=session_id,
-            status=RentStatus.ACTIVE,
-            start_ts=datetime.datetime.now(tz=datetime.timezone.utc),
-            admin_open_id=user.get("id"),
-        )
+    updated_session = RentalSession.update(
+        session=db.session,
+        id=session_id,
+        status=RentStatus.ACTIVE,
+        start_ts=datetime.datetime.now(tz=datetime.timezone.utc),
+        admin_open_id=user.get("id"),
     )
+
+    ActionLogger.log_event(
+        user_id=session.user_id,
+        admin_id=user.get("id"),
+        session_id=session.id,
+        action_type="START_SESSION",
+        details={"status": RentStatus.ACTIVE},
+    )
+
+    return RentalSessionGet.model_validate(updated_session)
 
 
 @rental_session.patch("/{session_id}/return", response_model=RentalSessionGet)
@@ -87,11 +110,21 @@ async def accept_end_rental_session(
         actual_return_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         admin_close_id=user.get("id"),
     )
+
+    ActionLogger.log_event(
+        user_id=rent_session.user_id,
+        admin_id=user.get("id"),
+        session_id=rent_session.id,
+        action_type="RETURN_SESSION",
+        details={"status": RentStatus.RETURNED},
+    )
+
     if with_strike:
         strike_info = StrikePost(
             user_id=ended_session.user_id, admin_id=user.get("id"), reason=strike_reason, session_id=rent_session.id
         )
         create_strike(strike_info, user=user)
+
     return RentalSessionGet.model_validate(ended_session)
 
 
@@ -133,7 +166,6 @@ async def get_rental_sessions(
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
-
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
@@ -154,6 +186,14 @@ async def update_rental_session(
         end_ts=session.end_ts,
         actual_return_ts=session.actual_return_ts,
         admin_close_id=session.admin_close_id,
+    )
+
+    ActionLogger.log_event(
+        user_id=session.user_id,
+        admin_id=user.get("id"),
+        session_id=session.id,
+        action_type="UPDATE_SESSION",
+        details={"status": session.status, "end_ts": session.end_ts, "actual_return_ts": session.actual_return_ts},
     )
 
     return RentalSessionGet.model_validate(updated_session)
