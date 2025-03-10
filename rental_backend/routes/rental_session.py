@@ -134,6 +134,17 @@ async def get_user_sessions(user_id, user=Depends(UnionAuth())):
     return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
 
 
+@rental_session.get("/{session_id}", response_model=list[RentalSessionGet])
+async def get_rental_session(
+    session_id: int, 
+    user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+):
+    session = RentalSession.get(id=session_id, session=db.session)
+    if not session:
+        raise ObjectNotFound
+    return RentalSessionGet.model_validate(session)
+
+
 @rental_session.get("", response_model=list[RentalSessionGet])
 async def get_rental_sessions(
     is_reserved: bool = Query(False, description="флаг, показывать заявки"),
