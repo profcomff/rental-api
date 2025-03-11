@@ -137,8 +137,7 @@ async def get_user_sessions(user_id, user=Depends(UnionAuth())):
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
 async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     session = RentalSession.get(id=session_id, session=db.session)
-    if not session:
-        raise ObjectNotFound
+
     return RentalSessionGet.model_validate(session)
 
 
