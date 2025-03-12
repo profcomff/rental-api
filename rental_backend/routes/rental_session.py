@@ -48,7 +48,6 @@ async def create_rental_session(item_type_id, background_tasks: BackgroundTasks,
 
     :param item_type_id: Идентификатор типа предмета.
     :param background_tasks: Фоновые задачи для выполнения.
-    :param user: Пользователь, авторизованный для выполнения действия.
     :return: Объект RentalSessionGet с информацией о созданной сессии аренды.
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
     """
@@ -196,7 +195,6 @@ async def get_rental_sessions(
     :param is_overdue: Флаг, показывать просроченные сессии.
     :param is_returned: Флаг, показывать возвращенные сессии.
     :param is_active: Флаг, показывать активные сессии.
-    :param user: Пользователь, авторизованный для выполнения действия.
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
     to_show = []
