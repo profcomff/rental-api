@@ -169,9 +169,9 @@ async def get_rental_sessions(
     return [RentalSessionGet.model_validate(rent_session) for rent_session in rent_sessions]
 
 
-@rental_session.delete("/{session_id}", response_model=RentalSessionGet)
-async def cancel_rental_session(session_id: int, user=Depends(UnionAuth()), db: Session = Depends(get_db)):
-    session = RentalSession.get(id=session_id, session=db)
+@rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
+async def cancel_rental_session(session_id: int, user=Depends(UnionAuth()), session=db.session):
+    session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
 
