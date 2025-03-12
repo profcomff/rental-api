@@ -18,7 +18,11 @@ RENTAL_SESSION_EXPIRY = datetime.timedelta(minutes=10)
 
 
 async def check_session_expiration(session_id: int):
-    """Background task to check and expire rental sessions."""
+    """
+    Фоновая задача для проверки и истечения срока аренды.
+
+    :param session_id: Идентификатор сессии аренды.
+    """
     await asyncio.sleep(RENTAL_SESSION_EXPIRY.total_seconds())
     session = RentalSession.query(session=db.session).filter(RentalSession.id == session_id).one_or_none()
     if session and session.status == RentStatus.RESERVED:
@@ -39,6 +43,15 @@ async def check_session_expiration(session_id: int):
 
 @rental_session.post("/{item_type_id}", response_model=RentalSessionGet)
 async def create_rental_session(item_type_id, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
+    """
+    Создает новую сессию аренды для указанного типа предмета.
+
+    :param item_type_id: Идентификатор типа предмета.
+    :param background_tasks: Фоновые задачи для выполнения.
+    :param user: Пользователь, авторизованный для выполнения действия.
+    :return: Объект RentalSessionGet с информацией о созданной сессии аренды.
+    :raises NoneAvailable: Если нет доступных предметов указанного типа.
+    """
     available_items = (
         Item.query(session=db.session).filter(Item.type_id == item_type_id, Item.is_available == True).all()
     )
@@ -68,6 +81,14 @@ async def create_rental_session(item_type_id, background_tasks: BackgroundTasks,
 
 @rental_session.patch("/{session_id}/start", response_model=RentalSessionGet)
 async def start_rental_session(session_id, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+    """
+    Начинает сессию аренды, изменяя её статус на ACTIVE.
+
+    :param session_id: Идентификатор сессии аренды.
+
+    :return: Объект RentalSessionGet с обновленной информацией о сессии аренды.
+    :raises ObjectNotFound: Если сессия с указанным идентификатором не найдена.
+    """
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
@@ -97,6 +118,15 @@ async def accept_end_rental_session(
     strike_reason: str = Query("", description="Описание причины страйка"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
+    """
+    Завершает сессию аренды, изменяя её статус на RETURNED. При необходимости выдает страйк.
+    :param session_id: Идентификатор сессии аренды.
+    :param with_strike: Флаг, указывающий, нужно ли выдать страйк.
+    :param strike_reason: Причина выдачи страйка.
+    :return: Объект RentalSessionGet с обновленной информацией о сессии аренды.
+    :raises ObjectNotFound: Если сессия с указанным идентификатором не найдена.
+    :raises InactiveSession: Если сессия не активна.
+    """
     rent_session = RentalSession.get(id=session_id, session=db.session)
     if not rent_session:
         raise ObjectNotFound
@@ -130,6 +160,12 @@ async def accept_end_rental_session(
 
 @rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
 async def get_user_sessions(user_id, user=Depends(UnionAuth())):
+    """
+    Получает список сессий аренды для указанного пользователя.
+
+    :param user_id: id пользователя.
+    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
+    """
     user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
     return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
 
@@ -144,6 +180,18 @@ async def get_rental_sessions(
     is_active: bool = Query(False, description="Флаг, показывать активные"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
+    """
+    Получает список сессий аренды с возможностью фильтрации по статусу.
+
+    :param is_reserved: Флаг, показывать зарезервированные сессии.
+    :param is_canceled: Флаг, показывать отмененные сессии.
+    :param is_dismissed: Флаг, показывать отклоненные сессии.
+    :param is_overdue: Флаг, показывать просроченные сессии.
+    :param is_returned: Флаг, показывать возвращенные сессии.
+    :param is_active: Флаг, показывать активные сессии.
+    :param user: Пользователь, авторизованный для выполнения действия.
+    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
+    """
     to_show = []
     if is_reserved:
         to_show.append(RentStatus.RESERVED)
@@ -166,10 +214,18 @@ async def get_rental_sessions(
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
+    """
+    Обновляет информацию о сессии аренды.
+
+    :param session_id: Идентификатор сессии аренды.
+    :param update_data: Данные для обновления сессии.
+    :return: Объект RentalSessionGet с обновленной информацией о сессии аренды.
+    :raises ObjectNotFound: Если сессия с указанным идентификатором не найдена.
+    """
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
-
+    # TODO сделать нормально, сейчас это плохо.
     if update_data.status:
         session.status = update_data.status
     if update_data.end_ts:
