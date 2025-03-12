@@ -222,7 +222,7 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
 
 
 @rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
-async def cancel_rental_session(session_id: int, user=Depends(UnionAuth()), session=db.session):
+async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
