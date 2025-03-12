@@ -217,6 +217,12 @@ async def get_rental_sessions(
     return [RentalSessionGet.model_validate(rent_session) for rent_session in rent_sessions]
 
 
+@rental_session.get("/{session_id}", response_model=RentalSessionGet)
+async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
+    session = RentalSession.get(id=session_id, session=db.session)
+    return RentalSessionGet.model_validate(session)
+
+
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
