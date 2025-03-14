@@ -226,15 +226,15 @@ async def cancel_rental_session(session_id: int, user_id, user=Depends(UnionAuth
     session = RentalSession.get(id=session_id, session=db.session)
 
     if user_id != session.user_id:
-        raise CloseMistake
+        raise CloseMistake()
 
-    if session.status != RentStatus.RESERVED
-        raise ColoseMistake
+    if session.status != RentStatus.RESERVED:
+        raise ColoseMistake()
 
     # Проверка временного диапазона
     start_time = session.reservation_ts if session.status == RentStatus.RESERVED else None
     if (datetime.utcnow() - start_time) > timedelta(minutes=10):
-        raise CloseMistake
+        raise CloseMistake()
 
     updated_session = RentalSession.update(
         session=db, id=session_id, status=RentStatus.CANCELED, canceled_at=datetime.utcnow()
