@@ -222,21 +222,19 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
 
 
 @rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
-async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
+async def cancel_rental_session(session_id: int, user_id, user=Depends(UnionAuth())):
     session = RentalSession.get(id=session_id, session=db.session)
-    if not session:
-        raise ObjectNotFound
 
-    if session.user_id != user.id and not user.has_scope("rental.session.admin"):
-        raise HTTPException()
+    if user_id != session.user_id:
+        raise CloseMistake
 
-    if session.status not in [RentStatus.RESERVED, RentStatus.ACTIVE]:
-        raise HTTPException()
+    if session.status != RentStatus.RESERVED
+        raise ColoseMistake
 
     # Проверка временного диапазона
-    start_time = session.start_ts if session.status == RentStatus.ACTIVE else session.reservation_ts
+    start_time = session.reservation_ts if session.status == RentStatus.RESERVED else None
     if (datetime.utcnow() - start_time) > timedelta(minutes=10):
-        raise HTTPException()
+        raise CloseMistake
 
     updated_session = RentalSession.update(
         session=db, id=session_id, status=RentStatus.CANCELED, canceled_at=datetime.utcnow()
