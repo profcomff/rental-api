@@ -76,7 +76,7 @@ class RentalSessionGet(Base):
     end_ts: datetime.datetime | None
     actual_return_ts: datetime.datetime | None
     status: RentStatus
-
+    strike_id: int | None
 
 class RentalSessionPatch(BaseModel):
     status: Optional[RentStatus] = None
