@@ -53,6 +53,7 @@ class RentalSession(BaseDbModel):
     end_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     actual_return_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     status: Mapped[RentStatus] = mapped_column(String, nullable=False)
+    strike_id: Mapped[int] = mapped_column(Integer, nullable=True)
 
 
 class Event(BaseDbModel):
