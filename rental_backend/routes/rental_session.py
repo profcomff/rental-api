@@ -5,7 +5,7 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi_sqlalchemy import db
 
-from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
+from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, UpdateError
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.routes.strike import create_strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
@@ -222,9 +222,7 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
 
 
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
-async def update_rental_session(
-    session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
-):
+async def update_rental_session(session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
     Обновляет информацию о сессии аренды.
 
@@ -234,8 +232,10 @@ async def update_rental_session(
     :raises ObjectNotFound: Если сессия с указанным идентификатором не найдена.
     """
     session = RentalSession.get(id=session_id, session=db.session)
+
     if not session:
         raise ObjectNotFound
+    
     # TODO сделать нормально, сейчас это плохо.
     if update_data.status:
         session.status = update_data.status
@@ -245,6 +245,13 @@ async def update_rental_session(
         session.actual_return_ts = update_data.actual_return_ts
     if update_data.admin_close_id:
         session.admin_close_id = update_data.admin_close_id
+
+    update_data_fields = ["status", "end_ts", "actual_return_ts", "admin_close_id"]
+    current_data = {key: getattr(session, key) for key in update_data_fields}  # Берем текущие значения из БД
+    unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
+
+    if unchanged_fields:
+        raise UpdateError
 
     updated_session = RentalSession.update(
         session=db.session,

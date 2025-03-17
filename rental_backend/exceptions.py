@@ -54,3 +54,10 @@ class InactiveSession(RentalApiError):
             f"Unable to end the session that isn't active",
             f"Нельзя завершить сессию, которая не активна",
         )
+
+class UpdateError(RentalApiError):
+    def __init__(self, obj: type, obj_id_or_name: int | str):
+        super().__init__(
+            f"Conflict with update a resource that already exists or has conflicting information.",
+            f"Конфликт с обновлением ресурса, который уже существует или имеет противоречивую информацию.",
+        )
