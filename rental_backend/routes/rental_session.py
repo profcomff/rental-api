@@ -221,6 +221,29 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     return RentalSessionGet.model_validate(session)
 
 
+@rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
+async def cancel_rental_session(session_id: int, user_id, user=Depends(UnionAuth())):
+    session = RentalSession.get(id=session_id, session=db.session)
+
+    if user_id != session.user_id:
+        raise CloseMistake()
+
+    if session.status != RentStatus.RESERVED:
+        raise ColoseMistake()
+
+    # Проверка временного диапазона
+    start_time = session.reservation_ts if session.status == RentStatus.RESERVED else None
+    if (datetime.utcnow() - start_time) > timedelta(minutes=10):
+        raise CloseMistake()
+
+    updated_session = RentalSession.update(
+        session=db, id=session_id, status=RentStatus.CANCELED, canceled_at=datetime.utcnow()
+    )
+    Item.update(session=db, id=session.item_id, is_available=True)
+
+    return RentalSessionGet.model_validate(updated_session)
+
+
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
