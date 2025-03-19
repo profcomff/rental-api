@@ -1,10 +1,5 @@
-import datetime
-import re
-from typing import Literal
-
-import aiohttp
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
 from rental_backend import settings
