@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
 from rental_backend.exceptions import DateRangeError

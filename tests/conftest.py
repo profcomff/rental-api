@@ -1,11 +1,11 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from rental_backend.models.db import *
 from rental_backend.routes import app
-from rental_backend.settings import Settings, get_settings
+from rental_backend.settings import get_settings
 
 
 @pytest.fixture

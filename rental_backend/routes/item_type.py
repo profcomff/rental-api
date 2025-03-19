@@ -1,12 +1,8 @@
-import datetime
-from typing import Literal
-
-import aiohttp
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from fastapi_sqlalchemy import db
 
-from rental_backend.exceptions import AlreadyExists, ForbiddenAction, ObjectNotFound
+from rental_backend.exceptions import ObjectNotFound
 from rental_backend.models.db import Item, ItemType
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemTypeGet, ItemTypePost

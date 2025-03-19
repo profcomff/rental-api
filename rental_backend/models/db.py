@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 import datetime
-import logging
-import uuid
 from enum import Enum
 
-from fastapi_sqlalchemy import db
-from sqlalchemy import JSON, UUID, Boolean, DateTime
-from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func, nulls_last, or_, true
-from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from .base import BaseDbModel
 

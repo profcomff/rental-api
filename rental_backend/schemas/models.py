@@ -1,10 +1,9 @@
 import datetime
 from typing import Optional
-from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
-from rental_backend.models.db import RentalSession, RentStatus
+from rental_backend.models.db import RentStatus
 from rental_backend.schemas.base import Base
 
 
