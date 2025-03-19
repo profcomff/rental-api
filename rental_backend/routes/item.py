@@ -17,10 +17,10 @@ from rental_backend.utils.action import ActionLogger
 
 
 settings: Settings = get_settings()
-item = APIRouter(prefix="/item", tags=["Item"])
+item = APIRouter(prefix="/items", tags=["Items"])  # Изменено на /items
 
 
-@item.get("/item", response_model=list[ItemGet])
+@item.get("/", response_model=list[ItemGet])  # URL: /items/
 async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
     """
     Получает список предметов. Если указан type_id, возвращает только предметы с этим типом.
@@ -35,7 +35,7 @@ async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> li
     return [ItemGet.model_validate(item) for item in items]
 
 
-@item.post("/item", response_model=ItemGet)
+@item.post("/", response_model=ItemGet)  # URL: /items/
 async def create_item(item: ItemPost, user=Depends(UnionAuth())) -> ItemGet:
     """
     Создает новый предмет.
@@ -58,7 +58,7 @@ async def create_item(item: ItemPost, user=Depends(UnionAuth())) -> ItemGet:
     return ItemGet.model_validate(new_item)
 
 
-@item.patch("/item/{id}", response_model=ItemGet)
+@item.patch("/{id}", response_model=ItemGet)  # URL: /items/{id}
 async def update_item(
     id: int, is_available: bool = Query(False, description="Флаг доступен ли предмет"), user=Depends(UnionAuth())
 ) -> ItemGet:
