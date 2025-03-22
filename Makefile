@@ -8,9 +8,9 @@ venv:
 	python3.11 -m venv venv
 
 format:
-	source ./venv/bin/activate && autoflake -r --in-place --remove-all-unused-imports ./rental-backend
-	source ./venv/bin/activate && isort ./rental-backend
-	source ./venv/bin/activate && black ./rental-backend
+	source ./venv/bin/activate && autoflake -r --in-place --remove-all-unused-imports ./rental_backend
+	source ./venv/bin/activate && isort ./rental_backend
+	source ./venv/bin/activate && black ./rental_backend
 	source ./venv/bin/activate && autoflake -r --in-place --remove-all-unused-imports ./tests
 	source ./venv/bin/activate && isort ./tests
 	source ./venv/bin/activate && black ./tests
