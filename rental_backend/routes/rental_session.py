@@ -225,16 +225,20 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
 async def cancel_rental_session(session_id: int, user_id, user=Depends(UnionAuth())):
     session = RentalSession.get(id=session_id, session=db.session)
 
-    if user_id != session.user_id:
-        raise CloseMistake()
+    current_user_id = user.get("id")
+    if current_user_id != session.user_id:
+        raise ForbiddenAction(detail="User is not allowed to cancel this session.")
 
     if session.status != RentStatus.RESERVED:
-        raise ColoseMistake()
+        raise ForbiddenAction(
+            detail=f"Cannot cancel session with status '{session.status}'. Only RESERVED sessions can be canceled."
+        )
 
-    # Проверка временного диапазона
     start_time = session.reservation_ts if session.status == RentStatus.RESERVED else None
-    if (datetime.utcnow() - start_time) > timedelta(minutes=10):
-        raise CloseMistake()
+    if (datetime.utcnow() - start_time) > RENTAL_SESSION_EXPIRY:
+        raise ForbiddenAction(
+            detail=f"Session cannot be canceled after {RENTAL_SESSION_EXPIRY.total_seconds()//60} minute reservation period"
+        )
 
     updated_session = RentalSession.update(
         session=db, id=session_id, status=RentStatus.CANCELED, canceled_at=datetime.utcnow()
