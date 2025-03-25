@@ -235,6 +235,7 @@ async def cancel_rental_session(session_id: int, user_id, user=Depends(UnionAuth
         )
 
     start_time = session.reservation_ts if session.status == RentStatus.RESERVED else None
+
     if (datetime.utcnow() - start_time) > RENTAL_SESSION_EXPIRY:
         raise ForbiddenAction(
             detail=f"Session cannot be canceled after {RENTAL_SESSION_EXPIRY.total_seconds()//60} minute reservation period"
