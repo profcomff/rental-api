@@ -237,26 +237,13 @@ async def update_rental_session(
     if not session:
         raise ObjectNotFound
     upd_data = update_data.model_dump(exclude_unset=True)
-
+    
     updated_session = RentalSession.update(
         session=db.session,
         id=session_id,
-        status=session.status,
-        end_ts=session.end_ts,
-        **upd_data,
-        actual_return_ts=session.actual_return_ts,
-        admin_close_id=session.admin_close_id,
+        **upd_data
     )
-
-    updated_session = RentalSession.update(
-        session=db.session,
-        id=session_id,
-        status=session.status,
-        end_ts=session.end_ts,
-        actual_return_ts=session.actual_return_ts,
-        admin_close_id=session.admin_close_id,
-    )
-
+    
     ActionLogger.log_event(
         user_id=session.user_id,
         admin_id=user.get("id"),
