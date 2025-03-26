@@ -222,7 +222,7 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
 
 
 @rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
-async def cancel_rental_session(session_id: int, user_id, user=Depends(UnionAuth())):
+async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):  # Удален лишний параметр user_id
     session = RentalSession.get(id=session_id, session=db.session)
 
     current_user_id = user.get("id")
@@ -243,9 +243,12 @@ async def cancel_rental_session(session_id: int, user_id, user=Depends(UnionAuth
         )
 
     updated_session = RentalSession.update(
-        session=db, id=session_id, status=RentStatus.CANCELED, canceled_at=datetime.utcnow()
+        session=db.session,  # Исправлено с db на db.session
+        id=session_id,
+        status=RentStatus.CANCELED,
+        canceled_at=datetime.datetime.utcnow(),  # Исправлено datetime.utcnow()
     )
-    Item.update(session=db, id=session.item_id, is_available=True)
+    Item.update(session=db.session, id=session.item_id, is_available=True)
 
     return RentalSessionGet.model_validate(updated_session)
 
