@@ -5,4 +5,3 @@ from rental_backend.models.db import Item
 
 
 url = '/item'
- 
