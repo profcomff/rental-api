@@ -221,6 +221,38 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     return RentalSessionGet.model_validate(session)
 
 
+@rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
+async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):  # Удален лишний параметр user_id
+    session = RentalSession.get(id=session_id, session=db.session)
+
+    current_user_id = user.get("id")
+    if current_user_id != session.user_id:
+        raise ForbiddenAction(detail="User is not allowed to cancel this session.")
+
+    if session.status != RentStatus.RESERVED:
+        raise ForbiddenAction(
+            detail=f"Cannot cancel session with status '{session.status}'. Only RESERVED sessions can be canceled."
+        )
+
+    current_time = datetime.datetime.now(tz=datetime.timezone.utc)
+    session_time = current_time - session.reservation_ts
+    
+    if session_time > RENTAL_SESSION_EXPIRY:
+        raise ForbiddenAction(
+            detail=f"Session cannot be canceled after {RENTAL_SESSION_EXPIRY.total_seconds()//60} minute reservation period"
+        ) 
+ 
+    updated_session = RentalSession.update(
+        session=db.session,  
+        id=session_id,
+        status=RentStatus.CANCELED,
+        canceled_at=datetime.datetime.utcnow(),
+    )
+    Item.update(session=db.session, id=session.item_id, is_available=True)
+
+    return RentalSessionGet.model_validate(updated_session)
+
+
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
