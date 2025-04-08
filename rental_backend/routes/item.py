@@ -31,7 +31,7 @@ async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> li
 
 
 @item.post("", response_model=ItemGet)
-async def create_item(item: ItemPost, user=Depends(UnionAuth())) -> ItemGet:
+async def create_item(item: ItemPost, user=Depends(UnionAuth(scopes=["rental.item.create"]))) -> ItemGet:
     """
     Создает новый предмет.
 
