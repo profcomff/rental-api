@@ -1,10 +1,5 @@
-import datetime
-import re
-from typing import Literal
-
-import aiohttp
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
 from rental_backend import settings
@@ -17,10 +12,10 @@ from rental_backend.utils.action import ActionLogger
 
 
 settings: Settings = get_settings()
-item = APIRouter(prefix="/item", tags=["Item"])
+item = APIRouter(prefix="/items", tags=["Items"])
 
 
-@item.get("/item", response_model=list[ItemGet])
+@item.get("", response_model=list[ItemGet])
 async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
     """
     Получает список предметов. Если указан type_id, возвращает только предметы с этим типом.
@@ -35,7 +30,8 @@ async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> li
     return [ItemGet.model_validate(item) for item in items]
 
 
-@item.post("/item", response_model=ItemGet)
+
+@item.post("", response_model=ItemGet)
 async def create_item(item: ItemPost, user=Depends(UnionAuth(scopes=["rental.item.create"]))) -> ItemGet:
     """
     Создает новый предмет.
@@ -58,7 +54,7 @@ async def create_item(item: ItemPost, user=Depends(UnionAuth(scopes=["rental.ite
     return ItemGet.model_validate(new_item)
 
 
-@item.patch("/item/{id}", response_model=ItemGet)
+@item.patch("/{id}", response_model=ItemGet)
 async def update_item(
     id: int,
     is_available: bool = Query(False, description="Флаг доступен ли предмет"),

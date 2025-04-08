@@ -2,10 +2,10 @@ import asyncio
 import datetime
 
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
+from rental_backend.exceptions import InactiveSession, NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.routes.strike import create_strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
