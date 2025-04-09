@@ -236,24 +236,9 @@ async def update_rental_session(
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
-    # TODO сделать нормально, сейчас это плохо.
-    if update_data.status:
-        session.status = update_data.status
-    if update_data.end_ts:
-        session.end_ts = update_data.end_ts
-    if update_data.actual_return_ts:
-        session.actual_return_ts = update_data.actual_return_ts
-    if update_data.admin_close_id:
-        session.admin_close_id = update_data.admin_close_id
+    upd_data = update_data.model_dump(exclude_unset=True)
 
-    updated_session = RentalSession.update(
-        session=db.session,
-        id=session_id,
-        status=session.status,
-        end_ts=session.end_ts,
-        actual_return_ts=session.actual_return_ts,
-        admin_close_id=session.admin_close_id,
-    )
+    updated_session = RentalSession.update(session=db.session, id=session_id, **upd_data)
 
     ActionLogger.log_event(
         user_id=session.user_id,
