@@ -31,7 +31,7 @@ async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> li
 
 
 @item.post("", response_model=ItemGet)
-async def create_item(item: ItemPost, user=Depends(UnionAuth())) -> ItemGet:
+async def create_item(item: ItemPost, user=Depends(UnionAuth(scopes=["rental.item.create"]))) -> ItemGet:
     """
     Создает новый предмет.
 
@@ -55,7 +55,9 @@ async def create_item(item: ItemPost, user=Depends(UnionAuth())) -> ItemGet:
 
 @item.patch("/{id}", response_model=ItemGet)
 async def update_item(
-    id: int, is_available: bool = Query(False, description="Флаг доступен ли предмет"), user=Depends(UnionAuth())
+    id: int,
+    is_available: bool = Query(False, description="Флаг доступен ли предмет"),
+    user=Depends(UnionAuth(scopes=["rental.item.patch"])),
 ) -> ItemGet:
     """
     Обновляет статус доступности предмета по его идентификатору.
