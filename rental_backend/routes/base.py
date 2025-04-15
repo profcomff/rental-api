@@ -38,7 +38,7 @@ app.add_middleware(
     allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
-app.add_middleware(LoggerMiddleware, service_id = settings.SERVICE_ID)
+app.add_middleware(LoggerMiddleware, service_id=settings.SERVICE_ID)
 
 app.include_router(event)
 app.include_router(item)
