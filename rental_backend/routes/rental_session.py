@@ -261,7 +261,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
 
     return RentalSessionGet.model_validate(updated_session)
 
-
+ 
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
