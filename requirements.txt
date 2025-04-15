@@ -10,3 +10,4 @@ pydantic-settings
 SQLAlchemy
 uvicorn
 aiohttp
+logger_middleware
