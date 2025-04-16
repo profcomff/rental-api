@@ -259,7 +259,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
         details={"status": RentStatus.CANCELED},
     )
 
-    return RentalSessionGet.model_validate(updated_session)
+    return RentalSessionGet.model_validate(updated_session)  
 
  
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
