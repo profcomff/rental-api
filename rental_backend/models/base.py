@@ -69,7 +69,6 @@ class BaseDbModel(Base):
             cur_v = getattr(obj, k)
             if cur_v != v:
                 setattr(obj, k, v)
-                print(f'Из base.update: {cur_v=}\t{v=}')
                 get_new_values = True
         if not get_new_values:
             raise AlreadyExists(cls, id)
