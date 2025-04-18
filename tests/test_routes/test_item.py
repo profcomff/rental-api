@@ -218,7 +218,7 @@ def test_query_for_update_item(item_fixture, client, dbsession, base_item_url, d
         ids=['valid_new_data', 'invalid_new_data', 'empty_data', 'old_data',]
 )
 def test_update_item_model(item_fixture, client, base_item_url, dbsession, data, is_updated):
-    """Проверка изменений в БД после отработки ручки PATCH /items"""
+    """Проверка наличия изменений в БД после отработки ручки PATCH /items"""
     old_model_fields = model_to_dict(item_fixture)
     response = client.patch(f"{base_item_url}/{item_fixture.id}{make_url_query(data)}")
     dbsession.refresh(item_fixture)
