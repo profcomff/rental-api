@@ -232,7 +232,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
 
     :param session_id: Идентификатор сессии аренды
     :raises ForbiddenAction: Если пользователь не владелец или статус не RESERVED
-    :return: Объект отмененной сессии аренды
+    :return: Объект отмененной сессии аренды 
     """
     session = RentalSession.get(id=session_id, session=db.session)
 
