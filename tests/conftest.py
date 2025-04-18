@@ -25,12 +25,21 @@ def client(mocker):
 
 @pytest.fixture()
 def dbsession():
+    """Фикстура настройки Session для работы с БД в тестах.
+    
+    .. caution::
+        Очистка производится путем удаления ВСЕХ объектов Event, Item
+        и ItemType из БД после тестов => Не запускайте эту фикстуру на
+        БД с данными, которые создаете вне тестов!
+    """
     settings = get_settings()
     engine = create_engine(str(settings.DB_DSN), pool_pre_ping=True)
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
     yield session
     session.query(Event).delete()
+    session.query(Item).delete()
+    session.query(ItemType).delete()
     session.commit()
     session.rollback()
     session.close()
@@ -38,23 +47,28 @@ def dbsession():
 
 @pytest.fixture()
 def item_type_fixture(dbsession):
+    """Фикстура ItemType.
+    
+    .. note::
+        Очистка производится в dbsession.
+    """
     item_type = ItemType(id=0, name='Test ItemType')
     dbsession.add(item_type)
     dbsession.commit()
-    yield item_type
-    dbsession.refresh(item_type)
-    dbsession.delete(item_type)
-    dbsession.commit()
+    return item_type
 
 
 @pytest.fixture(scope="function")
 def item_fixture(dbsession, item_type_fixture):
+    """Фикстура Item.
+    
+    .. note::
+        Очистка производится в dbsession.
+    """
     item = Item(type_id=item_type_fixture.id)
     dbsession.add(item)
     dbsession.commit()
-    yield item
-    dbsession.delete(item)
-    dbsession.commit()
+    return item
 
 
 @pytest.fixture(scope="function")
