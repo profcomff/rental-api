@@ -227,7 +227,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
 
     :param session_id: Идентификатор сессии аренды
     :raises ForbiddenAction: Если пользователь не владелец или статус не RESERVED
-    :return: Объект отмененной сессии аренды 
+    :return: Объект отмененной сессии аренды
     """
     session = RentalSession.get(id=session_id, session=db.session)
 
@@ -254,9 +254,9 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
         details={"status": RentStatus.CANCELED},
     )
 
-    return RentalSessionGet.model_validate(updated_session)  
+    return RentalSessionGet.model_validate(updated_session)
 
- 
+
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
