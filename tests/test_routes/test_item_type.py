@@ -1,3 +1,10 @@
+import pytest
+from starlette import status
+
+
+url = '/itemtype'
+
+
 def test_get_item_type(client, items_with_types):
     _, item_types = items_with_types
     response = client.get(f'{url}/{item_types[0].id}')
