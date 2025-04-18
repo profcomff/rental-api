@@ -221,11 +221,6 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     return RentalSessionGet.model_validate(session)
 
 
-# давай напишем краткое описание в функции, что она делает.
-# Что-то на подобии: """Отменяет сессию в статусе reserved.
-# Отменить может только сам юзер"""
-
-
 @rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
 async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
     """Отменяет сессию в статусе RESERVED. Отменить может только сам юзер
