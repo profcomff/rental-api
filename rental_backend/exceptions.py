@@ -54,3 +54,11 @@ class InactiveSession(RentalApiError):
             f"Unable to end the session that isn't active",
             f"Нельзя завершить сессию, которая не активна",
         )
+
+
+class CloseMistake(RentalApiError):
+    def __init__(self):
+        super().__init__(
+            "Unable to cancel session: operation not allowed",
+            "Невозможно отменить сессию: действие запрещено",
+        )
