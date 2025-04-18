@@ -8,7 +8,7 @@ from sqlalchemy import desc
 from rental_backend.__main__ import app
 from rental_backend.models.db import Item, ItemType
 from rental_backend.models.base import BaseDbModel
-from rental_backend.routes.base import item
+from rental_backend.routes.item import item
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemGet, ItemPost
 
