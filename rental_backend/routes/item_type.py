@@ -26,6 +26,8 @@ async def get_item_type(id: int) -> ItemTypeGet:
     item_type: ItemType = ItemType.query(session=db.session).filter(ItemType.id == id).one_or_none()
     if item_type is None:
         raise ObjectNotFound(ItemType, id)
+    free_items_count: int = Item.query(session=db.session).filter(Item.type_id == id, Item.is_available == True).count()
+    item_type.free_items_count = free_items_count
     return ItemTypeGet.model_validate(item_type)
 
 
@@ -37,9 +39,13 @@ async def get_items_types() -> list[ItemTypeGet]:
     :return: Список объектов ItemTypeGet с информацией о всех типах предметов.
     :raises ObjectNotFound: Если типы предметов не найдены.
     """
-    item_types_all = ItemType.query(session=db.session).all()
+    item_types_all: list[ItemType] = ItemType.query(session=db.session).all()
     if not item_types_all:
         raise ObjectNotFound(ItemType, 'all')
+    for item_type in item_types_all:
+        item_type.free_items_count = (
+            Item.query(session=db.session).filter(Item.type_id == item_type.id, Item.is_available == True).count()
+        )
     return [ItemTypeGet.model_validate(item_type) for item_type in item_types_all]
 
 
