@@ -6,7 +6,7 @@ from sqlalchemy import not_
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Query, Session, as_declarative, declared_attr
 
-from rental_backend.exceptions import ObjectNotFound, AlreadyExists
+from rental_backend.exceptions import AlreadyExists, ObjectNotFound
 
 
 @as_declarative()

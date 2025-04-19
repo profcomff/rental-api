@@ -1,17 +1,14 @@
-from typing import Dict, Any
+from typing import Dict
 
 import pytest
+from conftest import model_to_dict
 from fastapi.testclient import TestClient
-from starlette import status
 from sqlalchemy import desc
+from starlette import status
 
 from rental_backend.__main__ import app
-from rental_backend.models.db import Item, ItemType
-from rental_backend.models.base import BaseDbModel
+from rental_backend.models.db import Item
 from rental_backend.routes.item import item
-from rental_backend.schemas.base import StatusResponseModel
-from rental_backend.schemas.models import ItemGet, ItemPost
-from conftest import model_to_dict
 
 
 client = TestClient(app)
@@ -177,14 +174,29 @@ def test_create_item_with_empty_name():
 
 # Тесты для функции update_item
 @pytest.mark.parametrize(
-        'data, right_status_code',
-        [
-            ({"is_available": True,}, status.HTTP_200_OK),
-            ({"is_available": 'invalid'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ({}, {'set_old': status.HTTP_409_CONFLICT, 'set_new': status.HTTP_200_OK}),
-            ({"is_available": False,}, status.HTTP_409_CONFLICT),
-        ],
-        ids=['valid_new_data', 'invalid_new_data', 'empty_data', 'old_data',]
+    'data, right_status_code',
+    [
+        (
+            {
+                "is_available": True,
+            },
+            status.HTTP_200_OK,
+        ),
+        ({"is_available": 'invalid'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({}, {'set_old': status.HTTP_409_CONFLICT, 'set_new': status.HTTP_200_OK}),
+        (
+            {
+                "is_available": False,
+            },
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+    ids=[
+        'valid_new_data',
+        'invalid_new_data',
+        'empty_data',
+        'old_data',
+    ],
 )
 def test_query_for_update_item(item_fixture, client, dbsession, base_item_url, data, right_status_code):
     """Проверка реакции ручки PATCH /items на разные входные данные."""
@@ -202,14 +214,29 @@ def test_query_for_update_item(item_fixture, client, dbsession, base_item_url, d
 
 
 @pytest.mark.parametrize(
-        'data, is_updated',
-        [
-            ({"is_available": True,}, True),
-            ({"is_available": 'invalid'}, False),
-            ({}, {status.HTTP_409_CONFLICT: False, status.HTTP_200_OK: True}),
-            ({"is_available": False,}, False),
-        ],
-        ids=['valid_new_data', 'invalid_new_data', 'empty_data', 'old_data',]
+    'data, is_updated',
+    [
+        (
+            {
+                "is_available": True,
+            },
+            True,
+        ),
+        ({"is_available": 'invalid'}, False),
+        ({}, {status.HTTP_409_CONFLICT: False, status.HTTP_200_OK: True}),
+        (
+            {
+                "is_available": False,
+            },
+            False,
+        ),
+    ],
+    ids=[
+        'valid_new_data',
+        'invalid_new_data',
+        'empty_data',
+        'old_data',
+    ],
 )
 def test_update_item_model(item_fixture, client, base_item_url, dbsession, data, is_updated):
     """Проверка наличия изменений в БД после отработки ручки PATCH /items"""
@@ -226,7 +253,7 @@ def test_update_item_model(item_fixture, client, base_item_url, dbsession, data,
 
 def test_update_item_not_found(client, dbsession, base_item_url):
     """Пробует обновить несуществующий Item.
-    
+
     .. caution::
         Несуществующий id осуществляется без учета id 'soft deleted' Item.
         Поэтому возможны ошибки при изменении поведения Item.query().

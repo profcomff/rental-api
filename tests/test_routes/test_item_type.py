@@ -1,14 +1,10 @@
-from typing import Dict, Any
-
 import pytest
-from starlette import status
-from fastapi.testclient import TestClient
+from conftest import model_to_dict
 from sqlalchemy import desc
+from starlette import status
 
-from rental_backend.models.base import BaseDbModel
 from rental_backend.models.db import ItemType
 from rental_backend.routes.item_type import item_type
-from conftest import model_to_dict
 
 
 # New fixtures for itemtype tests
@@ -52,28 +48,38 @@ def test_get_item_types(client, items_with_types, type_id, response_status):
         ({'name': 'New ItemType', 'description': 'newnew'}, status.HTTP_200_OK),
         ({'name': 'New ItemType', 'image_url': 'path_to_image'}, status.HTTP_200_OK),
         ({'name': 'New ItemType'}, status.HTTP_200_OK),
-        ({'name': 'New ItemType', 'image_url': 'path_to_image', 'description': 'newnew', 'extra': 'oops!'}, status.HTTP_200_OK),
+        (
+            {'name': 'New ItemType', 'image_url': 'path_to_image', 'description': 'newnew', 'extra': 'oops!'},
+            status.HTTP_200_OK,
+        ),
         ({'name': 1, 'image_url': 'path_to_image', 'description': 'newnew'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
         ({'name': 'New ItemType', 'image_url': True, 'description': 'newnew'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({'name': 'New ItemType', 'image_url': 'path_to_image', 'description': ['biba', 'boba']}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        (
+            {'name': 'New ItemType', 'image_url': 'path_to_image', 'description': ['biba', 'boba']},
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
         ({}, status.HTTP_422_UNPROCESSABLE_ENTITY),
         ({'name': 'Test ItemType'}, status.HTTP_409_CONFLICT),
-        ({'name': 'Test ItemType', 'image_url': 'path_to_image', 'description': 'newnew'}, status.HTTP_200_OK)
+        ({'name': 'Test ItemType', 'image_url': 'path_to_image', 'description': 'newnew'}, status.HTTP_200_OK),
     ],
-    ids=['valid_new_payload',
-         'invalid_new_without_name',
-         'valid_new_without_url',
-         'valid_new_without_desc',   
-         'valid_new_only_name',
-         'valid_new_with_extra_field',
-         'invalid_name',
-         'invalid_image_url',
-         'inavalid_desc',
-         'empty_payload',
-         'full_old_payload',
-         'part_old_payload']
+    ids=[
+        'valid_new_payload',
+        'invalid_new_without_name',
+        'valid_new_without_url',
+        'valid_new_without_desc',
+        'valid_new_only_name',
+        'valid_new_with_extra_field',
+        'invalid_name',
+        'invalid_image_url',
+        'inavalid_desc',
+        'empty_payload',
+        'full_old_payload',
+        'part_old_payload',
+    ],
 )
-def test_payload_for_update_itemtype(dbsession, item_type_fixture, client, base_itemtype_url, payload, right_status_code):
+def test_payload_for_update_itemtype(
+    dbsession, item_type_fixture, client, base_itemtype_url, payload, right_status_code
+):
     """Проверка реакции ручки PATCH /itemtype на разные входные данные."""
     response = client.patch(f"{base_itemtype_url}/{item_type_fixture.id}", json=payload)
     assert response.status_code == right_status_code
@@ -93,20 +99,22 @@ def test_payload_for_update_itemtype(dbsession, item_type_fixture, client, base_
         ({'name': 'New ItemType', 'image_url': 'path_to_image', 'description': ['biba', 'boba']}, False),
         ({}, False),
         ({'name': 'Test ItemType'}, False),
-        ({'name': 'Test ItemType', 'image_url': 'path_to_image', 'description': 'newnew'}, True)
+        ({'name': 'Test ItemType', 'image_url': 'path_to_image', 'description': 'newnew'}, True),
     ],
-    ids=['valid_new_payload',
-         'invalid_new_without_name',
-         'valid_new_without_url',
-         'valid_new_without_desc',   
-         'valid_new_only_name',
-         'valid_new_with_extra_field',
-         'invalid_name',
-         'invalid_image_url',
-         'inavalid_desc',
-         'empty_payload',
-         'full_old_payload',
-         'part_old_payload']
+    ids=[
+        'valid_new_payload',
+        'invalid_new_without_name',
+        'valid_new_without_url',
+        'valid_new_without_desc',
+        'valid_new_only_name',
+        'valid_new_with_extra_field',
+        'invalid_name',
+        'invalid_image_url',
+        'inavalid_desc',
+        'empty_payload',
+        'full_old_payload',
+        'part_old_payload',
+    ],
 )
 def test_update_itemtype_model(dbsession, item_type_fixture, client, base_itemtype_url, payload, is_updated):
     """Проверка наличия изменений в БД после отработки ручки PATCH /itemtype"""
@@ -120,16 +128,12 @@ def test_update_itemtype_model(dbsession, item_type_fixture, client, base_itemty
 
 def test_update_itemtype_not_found(client, dbsession, base_itemtype_url):
     """Пробует обновить несуществующий ItemType.
-    
+
     .. caution::
         Несуществующий id осуществляется без учета id 'soft deleted' ItemType.
         Поэтому возможны ошибки при изменении поведения ItemType.query().
     """
-    payload = {
-        'name': 'New ItemType',
-        'image_url': 'path_to_image',
-        'description': 'newnew'
-    }
+    payload = {'name': 'New ItemType', 'image_url': 'path_to_image', 'description': 'newnew'}
     try:
         unexisting_id = ItemType.query(session=dbsession).order_by(desc('id'))[0].id + 1
     except IndexError:

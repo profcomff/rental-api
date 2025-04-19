@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any, Dict
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +13,7 @@ from rental_backend.settings import get_settings
 @pytest.fixture
 def authlib_user():
     """Данные о пользователе, возвращаемые сервисом auth.
-    
+
     Составлено на основе: https://clck.ru/3LWzxt
     """
     return {
@@ -23,7 +23,7 @@ def authlib_user():
         "indirect_groups": [0],
         "groups": [0],
         "id": 0,
-        "email": "string"
+        "email": "string",
     }
 
 
@@ -43,7 +43,7 @@ def base_test_url(client):
 @pytest.fixture()
 def dbsession():
     """Фикстура настройки Session для работы с БД в тестах.
-    
+
     .. caution::
         Очистка производится путем удаления ВСЕХ объектов Event, Item,
         ItemType и RentalSession из БД после тестов => Не запускайте эту фикстуру на
@@ -66,7 +66,7 @@ def dbsession():
 @pytest.fixture()
 def item_type_fixture(dbsession):
     """Фикстура ItemType.
-    
+
     .. note::
         Очистка производится в dbsession.
     """
@@ -79,7 +79,7 @@ def item_type_fixture(dbsession):
 @pytest.fixture(scope="function")
 def item_fixture(dbsession, item_type_fixture):
     """Фикстура Item.
-    
+
     .. note::
         Очистка производится в dbsession.
     """
