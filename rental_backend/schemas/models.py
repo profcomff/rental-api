@@ -12,6 +12,7 @@ class ItemTypeGet(Base):
     name: str
     image_url: str | None = None
     description: str | None = None
+    free_items_count: int | None = None
 
 
 class ItemTypePost(Base):

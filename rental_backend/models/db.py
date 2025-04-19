@@ -31,6 +31,8 @@ class ItemType(BaseDbModel):
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     items: Mapped[list[Item]] = relationship("Item", back_populates="type")
+    
+    
 
 
 class RentalSession(BaseDbModel):

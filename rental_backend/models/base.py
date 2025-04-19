@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from sqlalchemy import not_
+from sqlalchemy import inspect
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Query, Session, as_declarative, declared_attr
 
@@ -75,3 +76,5 @@ class BaseDbModel(Base):
         else:
             session.delete(obj)
         session.flush()
+    
+ 
