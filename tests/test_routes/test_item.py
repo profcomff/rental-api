@@ -11,20 +11,14 @@ from rental_backend.models.base import BaseDbModel
 from rental_backend.routes.item import item
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemGet, ItemPost
+from conftest import model_to_dict
 
 
 client = TestClient(app)
 url = '/item'
 
 
-def model_to_dict(model: BaseDbModel) -> Dict[str, Any]:
-    """Возвращает поля модели БД в виде словаря."""
-    model_dict = dict()
-    for col in model.__table__.columns:
-        model_dict[col.name] = getattr(model, col.name)
-    return model_dict
-
-
+# Utils
 def make_url_query(data: Dict) -> str:
     """Вспомогательная функция для преобразования входных данных
     в строку параметров URL.
@@ -38,9 +32,9 @@ def make_url_query(data: Dict) -> str:
 
 
 @pytest.fixture
-def base_item_url(client: TestClient) -> str:
+def base_item_url(base_test_url) -> str:
     """Формирует корневой URL для Item."""
-    return f'{client.base_url}{item.prefix}'
+    return f'{base_test_url}{item.prefix}'
 
 
 @pytest.fixture

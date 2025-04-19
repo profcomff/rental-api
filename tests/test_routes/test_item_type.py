@@ -8,22 +8,14 @@ from sqlalchemy import desc
 from rental_backend.models.base import BaseDbModel
 from rental_backend.models.db import ItemType
 from rental_backend.routes.item_type import item_type
-
-
-# Utils for tests
-def model_to_dict(model: BaseDbModel) -> Dict[str, Any]:
-    """Возвращает поля модели БД в виде словаря."""
-    model_dict = dict()
-    for col in model.__table__.columns:
-        model_dict[col.name] = getattr(model, col.name)
-    return model_dict
+from conftest import model_to_dict
 
 
 # New fixtures for itemtype tests
 @pytest.fixture
-def base_itemtype_url(client: TestClient) -> str:
+def base_itemtype_url(base_test_url) -> str:
     """Формирует корневой URL для Item."""
-    return f'{client.base_url}{item_type.prefix}'
+    return f'{base_test_url}{item_type.prefix}'
 
 
 url = '/itemtype'
