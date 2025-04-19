@@ -69,7 +69,7 @@ async def update_item(
     """
     item = Item.query(session=db.session).filter(Item.id == id).one_or_none()
     if item is not None:
-        item.is_available = is_available
+        Item.update(id=item.id, session=db.session, is_available=is_available)
         ActionLogger.log_event(
             user_id=None,
             admin_id=user.get('id'),
