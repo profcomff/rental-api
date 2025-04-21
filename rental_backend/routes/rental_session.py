@@ -221,6 +221,42 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     return RentalSessionGet.model_validate(session)
 
 
+@rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
+async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
+    """Отменяет сессию в статусе RESERVED. Отменить может только сам юзер
+
+    :param session_id: Идентификатор сессии аренды
+    :raises ForbiddenAction: Если пользователь не владелец или статус не RESERVED
+    :return: Объект отмененной сессии аренды
+    """
+    session = RentalSession.get(id=session_id, session=db.session)
+
+    if user.get("id") != session.user_id:
+        raise ForbiddenAction(detail="User is not allowed to cancel this session.")
+
+    if session.status != RentStatus.RESERVED:
+        raise ForbiddenAction(
+            detail=f"Cannot cancel session with status '{session.status}'. Only RESERVED sessions can be canceled."
+        )
+
+    updated_session = RentalSession.update(
+        session=db.session,
+        id=session_id,
+        status=RentStatus.CANCELED,
+    )
+    Item.update(session=db.session, id=session.item_id, is_available=True)
+
+    ActionLogger.log_event(
+        user_id=user.get("id"),
+        admin_id=None,
+        session_id=session.id,
+        action_type="CANCEL_SESSION",
+        details={"status": RentStatus.CANCELED},
+    )
+
+    return RentalSessionGet.model_validate(updated_session)
+
+
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
@@ -236,24 +272,9 @@ async def update_rental_session(
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound
-    # TODO сделать нормально, сейчас это плохо.
-    if update_data.status:
-        session.status = update_data.status
-    if update_data.end_ts:
-        session.end_ts = update_data.end_ts
-    if update_data.actual_return_ts:
-        session.actual_return_ts = update_data.actual_return_ts
-    if update_data.admin_close_id:
-        session.admin_close_id = update_data.admin_close_id
+    upd_data = update_data.model_dump(exclude_unset=True)
 
-    updated_session = RentalSession.update(
-        session=db.session,
-        id=session_id,
-        status=session.status,
-        end_ts=session.end_ts,
-        actual_return_ts=session.actual_return_ts,
-        admin_close_id=session.admin_close_id,
-    )
+    updated_session = RentalSession.update(session=db.session, id=session_id, **upd_data)
 
     ActionLogger.log_event(
         user_id=session.user_id,

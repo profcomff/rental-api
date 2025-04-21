@@ -1,6 +1,7 @@
 # Сервис цифрового проката
+[<img src="https://cdn.profcomff.com/easycode/easycode.svg" width="200"></img>](https://easycode.profcomff.com/templates/docker-fastapi/workspace?mode=manual&param.Repository+URL=https://github.com/profcomff/rental-api.git&param.Working+directory=rental-api)
 
-Краткое описание
+Сервис проката повербанков и не только
 
 ## Запуск
 
