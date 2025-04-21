@@ -11,7 +11,6 @@ from rental_backend.models.db import Item
 from rental_backend.routes.item import item
 
 
-
 client = TestClient(app)
 url = '/item'
 
