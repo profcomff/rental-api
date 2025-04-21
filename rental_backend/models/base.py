@@ -6,7 +6,7 @@ from sqlalchemy import not_
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Query, Session, as_declarative, declared_attr
 
-from rental_backend.exceptions import ObjectNotFound
+from rental_backend.exceptions import AlreadyExists, ObjectNotFound
 
 
 @as_declarative()
@@ -60,9 +60,19 @@ class BaseDbModel(Base):
 
     @classmethod
     def update(cls, id: int | str, *, session: Session, **kwargs) -> BaseDbModel:
+        """Update model with new values from kwargs.
+        If no new values are given, raise HTTP 409 error.
+        """
+        get_new_values = False
         obj = cls.get(id, session=session)
         for k, v in kwargs.items():
-            setattr(obj, k, v)
+            cur_v = getattr(obj, k)
+            if cur_v != v:
+                setattr(obj, k, v)
+                get_new_values = True
+        if not get_new_values:
+            raise AlreadyExists(cls, id)
+        session.add(obj)
         session.flush()
         return obj
 

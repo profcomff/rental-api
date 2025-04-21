@@ -1,12 +1,38 @@
+from typing import Dict
+
 import pytest
+from conftest import model_to_dict
 from fastapi.testclient import TestClient
+from sqlalchemy import desc
 from starlette import status
 
 from rental_backend.__main__ import app
+from rental_backend.models.db import Item
+from rental_backend.routes.item import item
+
 
 
 client = TestClient(app)
 url = '/item'
+
+
+# Utils
+def make_url_query(data: Dict) -> str:
+    """Вспомогательная функция для преобразования входных данных
+    в строку параметров URL.
+    """
+    if len(data) == 0:
+        return ''
+    if len(data) == 1:
+        for k in data:
+            return f'?{k}={data[k]}'
+    return '?' + '?'.join(f'{k}={data[k]}' for k in data)
+
+
+@pytest.fixture
+def base_item_url(base_test_url) -> str:
+    """Формирует корневой URL для Item."""
+    return f'{base_test_url}{item.prefix}'
 
 
 @pytest.fixture
@@ -148,20 +174,97 @@ def test_create_item_with_empty_name():
 
 
 # Тесты для функции update_item
-def test_update_item_success(mock_item):
-    update_data = {
-        "is_available": False,
-    }
-    response = client.patch(f"{url}/item/1", json=update_data)
-    assert response.status_code == status.HTTP_200_OK
-    assert response.json()["is_available"] == False
+@pytest.mark.parametrize(
+    'data, right_status_code',
+    [
+        (
+            {
+                "is_available": True,
+            },
+            status.HTTP_200_OK,
+        ),
+        ({"is_available": 'invalid'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({}, {'set_old': status.HTTP_409_CONFLICT, 'set_new': status.HTTP_200_OK}),
+        (
+            {
+                "is_available": False,
+            },
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+    ids=[
+        'valid_new_data',
+        'invalid_new_data',
+        'empty_data',
+        'old_data',
+    ],
+)
+def test_query_for_update_item(item_fixture, client, dbsession, base_item_url, data, right_status_code):
+    """Проверка реакции ручки PATCH /items на разные входные данные."""
+    old_model_fields = model_to_dict(item_fixture)
+    response = client.patch(f"{base_item_url}/{item_fixture.id}{make_url_query(data)}")
+    if isinstance(right_status_code, dict):
+        dbsession.refresh(item_fixture)
+        new_model_fields = model_to_dict(item_fixture)
+        if new_model_fields == old_model_fields:
+            assert response.status_code == right_status_code['set_old']
+        else:
+            assert response.status_code == right_status_code['set_new']
+    else:
+        assert response.status_code == right_status_code
 
 
-def test_update_item_not_found():
-    update_data = {
-        "is_available": False,
-    }
-    response = client.patch(f"{url}/item/999", json=update_data)
+@pytest.mark.parametrize(
+    'data, is_updated',
+    [
+        (
+            {
+                "is_available": True,
+            },
+            True,
+        ),
+        ({"is_available": 'invalid'}, False),
+        ({}, {status.HTTP_409_CONFLICT: False, status.HTTP_200_OK: True}),
+        (
+            {
+                "is_available": False,
+            },
+            False,
+        ),
+    ],
+    ids=[
+        'valid_new_data',
+        'invalid_new_data',
+        'empty_data',
+        'old_data',
+    ],
+)
+def test_update_item_model(item_fixture, client, base_item_url, dbsession, data, is_updated):
+    """Проверка наличия изменений в БД после отработки ручки PATCH /items"""
+    old_model_fields = model_to_dict(item_fixture)
+    response = client.patch(f"{base_item_url}/{item_fixture.id}{make_url_query(data)}")
+    dbsession.refresh(item_fixture)
+    new_model_fields = model_to_dict(item_fixture)
+    if isinstance(is_updated, dict):
+        assert (old_model_fields != new_model_fields) == is_updated[response.status_code]
+    else:
+        is_really_changed = old_model_fields != new_model_fields
+        assert is_really_changed == is_updated
+
+
+def test_update_item_not_found(client, dbsession, base_item_url):
+    """Пробует обновить несуществующий Item.
+
+    .. caution::
+        Несуществующий id осуществляется без учета id 'soft deleted' Item.
+        Поэтому возможны ошибки при изменении поведения Item.query().
+    """
+    try:
+        unexisting_id = Item.query(session=dbsession).order_by(desc('id'))[0].id + 1
+    except IndexError:
+        unexisting_id = 1
+    query_params = make_url_query({'is_available': True})
+    response = client.patch(f"{base_item_url}/{unexisting_id}{query_params}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
@@ -183,28 +286,6 @@ def test_update_item_internal_server_error(monkeypatch):
     }
     response = client.patch(f"{url}/item/1", json=update_data)
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
-
-def test_update_item_with_invalid_data():
-    update_data = {
-        "is_available": "invalid",
-    }
-    response = client.patch(f"{url}/item/1", json=update_data)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-
-
-def test_update_item_with_no_changes(mock_item):
-    update_data = {
-        "is_available": True,
-    }
-    response = client.patch(f"{url}/item/1", json=update_data)
-    assert response.status_code == status.HTTP_200_OK
-    assert response.json()["is_available"] == True
-
-
-def test_update_item_with_empty_data():
-    response = client.patch(f"{url}/item/1", json={})
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 # Тесты для функции delete_item
