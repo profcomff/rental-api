@@ -31,7 +31,9 @@ def authlib_user():
 def client(mocker, authlib_user):
     user_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
     user_mock.return_value = authlib_user
-    client = TestClient(app)
+    # app.build_middleware_stack  # TODO: Посмотреть в сторону этих замещений. Тогда тесты и сервис будут разведены. https://github.com/fastapi/fastapi/issues/2495
+    # app.user_middleware
+    client = TestClient(app, raise_server_exceptions=False)
     return client
 
 
