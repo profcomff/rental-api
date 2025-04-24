@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from typing import Optional
 
 from auth_lib.fastapi import UnionAuth
@@ -18,7 +18,9 @@ strike = APIRouter(prefix="/strike", tags=["Strike"])
 async def create_strike(
     strike_info: StrikePost, user=Depends(UnionAuth(scopes=["rental.strike.create"], allow_none=False))
 ) -> StrikeGet:
-    new_strike = Strike.create(session=db.session, **strike_info.model_dump())
+    new_strike = Strike.create(
+        session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
+    )
     ActionLogger.log_event(
         user_id=strike_info.user_id,
         admin_id=user.get('id'),
@@ -40,8 +42,8 @@ async def get_strikes(
     user_id: Optional[int] = Query(None),
     admin_id: Optional[int] = Query(None),
     session_id: Optional[int] = Query(None),
-    from_date: Optional[datetime] = Query(None),
-    to_date: Optional[datetime] = Query(None),
+    from_date: Optional[datetime.datetime] = Query(None),
+    to_date: Optional[datetime.datetime] = Query(None),
     user=Depends(UnionAuth(scopes=["rental.strike.read"], allow_none=False)),
 ) -> list[StrikeGet]:
     if (from_date is None) != (to_date is None):
