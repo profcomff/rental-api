@@ -6,9 +6,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
-from rental_backend.models.db import Item, ItemType, RentalSession
-from rental_backend.routes.strike import create_strike
-from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
+from rental_backend.models.db import Item, ItemType, RentalSession, Strike
+from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikeGet, StrikePost
 from rental_backend.utils.action import ActionLogger
 
 
@@ -152,7 +151,17 @@ async def accept_end_rental_session(
         strike_info = StrikePost(
             user_id=ended_session.user_id, admin_id=user.get("id"), reason=strike_reason, session_id=rent_session.id
         )
-        create_strike(strike_info, user=user)
+        new_strike = Strike.create(
+            session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
+        )
+
+        ActionLogger.log_event(
+            user_id=strike_info.user_id,
+            admin_id=user.get("id"),
+            session_id=strike_info.session_id,
+            action_type="CREATE_STRIKE",
+            details=strike_info.model_dump(),
+        )
 
     return RentalSessionGet.model_validate(ended_session)
 
