@@ -5,7 +5,7 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rental_backend.exceptions import InactiveSession, NoneAvailable, ObjectNotFound
+from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.routes.strike import create_strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
@@ -90,7 +90,7 @@ async def start_rental_session(session_id, user=Depends(UnionAuth(scopes=["renta
     """
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
-        raise ObjectNotFound
+        raise ObjectNotFound(RentalSession, session_id)
     updated_session = RentalSession.update(
         session=db.session,
         id=session_id,
@@ -128,9 +128,9 @@ async def accept_end_rental_session(
     """
     rent_session = RentalSession.get(id=session_id, session=db.session)
     if not rent_session:
-        raise ObjectNotFound
+        raise ObjectNotFound(RentalSession, session_id)
     if rent_session.status != RentStatus.ACTIVE:
-        raise InactiveSession
+        raise InactiveSession(RentalSession, session_id)
     ended_session = RentalSession.update(
         session=db.session,
         id=session_id,
@@ -232,12 +232,10 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
     session = RentalSession.get(id=session_id, session=db.session)
 
     if user.get("id") != session.user_id:
-        raise ForbiddenAction(detail="User is not allowed to cancel this session.")
+        raise ForbiddenAction(RentalSession)
 
     if session.status != RentStatus.RESERVED:
-        raise ForbiddenAction(
-            detail=f"Cannot cancel session with status '{session.status}'. Only RESERVED sessions can be canceled."
-        )
+        raise ForbiddenAction(RentalSession)
 
     updated_session = RentalSession.update(
         session=db.session,
@@ -271,7 +269,7 @@ async def update_rental_session(
     """
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
-        raise ObjectNotFound
+        raise ObjectNotFound(RentalSession, session_id)
     upd_data = update_data.model_dump(exclude_unset=True)
 
     updated_session = RentalSession.update(session=db.session, id=session_id, **upd_data)
