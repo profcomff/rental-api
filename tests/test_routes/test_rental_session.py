@@ -390,25 +390,27 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, rentses_wit
 
 
 # Tests for GET /rental_session/user/{user_id}
-# @pytest.mark.parametrize(
-#         'user_id, right_status_code',
-#         [
-#             ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-#             ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-#             ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-#             (-1, status.HTTP_404_NOT_FOUND),
-#             ('', status.HTTP_404_NOT_FOUND)
-#         ],
-#         ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
-# )
-# def test_get_for_user_with_invalid_id(dbsession, client, base_rentses_url, rentses, user_id, right_status_code):
-#     """Проверка логики метода с невалидным user_id."""
-#     response = client.patch(f'{base_rentses_url}/user/{user_id}')
-#     if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-#         pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
-#     assert response.status_code == right_status_code
-#     dbsession.refresh(rentses)
-#     assert rentses.status != RentStatus.ACTIVE, 'Убедитесь, что при невалидном запросе сессия не переводится в RentStatus.ACTIVE!'
+@pytest.mark.parametrize(
+        'user_id, right_status_code',
+        [
+            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+            (-1, status.HTTP_200_OK),
+            ('', status.HTTP_422_UNPROCESSABLE_ENTITY)
+        ],
+        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
+)
+def test_get_for_user_with_invalid_id(dbsession, client, base_rentses_url, rentses, user_id, right_status_code):
+    """Проверка логики метода с невалидным user_id."""
+    response = client.get(f'{base_rentses_url}/user/{user_id}')
+    if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
+        pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
+    assert response.status_code == right_status_code
+    if right_status_code == status.HTTP_200_OK:
+        returned_queue = response.json()
+        assert isinstance(returned_queue, list), 'Убедитесь, что возвращаемый объект типа List!'
+        assert len(returned_queue) == 0, 'Убедитесь, что при передаче невалидного user_id возвращается пустой список.'
 
 
 # Tests for PATCH /rental_session/{session_id}

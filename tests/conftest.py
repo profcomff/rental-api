@@ -33,7 +33,7 @@ def client(mocker, authlib_user):
     user_mock.return_value = authlib_user
     # app.build_middleware_stack  # TODO: Посмотреть в сторону этих замещений. Тогда тесты и сервис будут разведены. https://github.com/fastapi/fastapi/issues/2495
     # app.user_middleware
-    client = TestClient(app)  # , raise_server_exceptions=False)
+    client = TestClient(app, raise_server_exceptions=False)
     return client
 
 
