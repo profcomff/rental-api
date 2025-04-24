@@ -345,11 +345,11 @@ def test_return_inactive(dbsession, client, rentses, base_rentses_url):
     """Проверка логики метода с попыткой закончить неактивную аренды."""
     # check_creation = check_object_creation(RentalSession, dbsession)  # TODO: Мб переписать как контекстный менеджер? Типа этот check же в контекст события...
     # next(check_creation)
+    old_rent_status = rentses.status
     response = client.patch(f'{base_rentses_url}/{rentses.id}/return')
-    if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        pytest.xfail(reason='Ждет хэндлер под ошибку InactiveSession. Удалить, как появиться и переписать тест с проверкой возвращения нужного HTTP-статуса.')
+    assert response.status_code == status.HTTP_409_CONFLICT
     dbsession.refresh(rentses)
-    assert rentses.status == RentStatus.ACTIVE, 'Убедитесь, что при старте аренды сессия переводится в RentStatus.ACTIVE!'
+    assert rentses.status == old_rent_status, 'Убедитесь, что при попытке завершить неактивную аренду ее статус не меняется!'
 
 
 @pytest.mark.parametrize(
@@ -385,6 +385,7 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, rentses_wit
     """Проверяет, что при обновлении RentalSession с end_ts не None сохраняется именно существующий, а не создается новый."""
     old_end_ts = rentses_with_end_ts.end_ts
     response = client.patch(f'{base_rentses_url}/{rentses_with_end_ts.id}/return')
+    assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(rentses_with_end_ts)
     assert rentses_with_end_ts.end_ts == old_end_ts, 'Убедитесь, что при завершении аренды end_ts не меняется, если он не был None!'
 

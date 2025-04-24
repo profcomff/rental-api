@@ -57,6 +57,7 @@ def dbsession():
     session = TestingSessionLocal()
     yield session
     session.query(Event).delete()
+    session.query(Strike).delete()
     session.query(RentalSession).delete()
     session.query(Item).delete()
     session.query(ItemType).delete()
