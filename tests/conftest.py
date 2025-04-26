@@ -167,3 +167,15 @@ def model_to_dict(model: BaseDbModel) -> Dict[str, Any]:
     for col in model.__table__.columns:
         model_dict[col.name] = getattr(model, col.name)
     return model_dict
+
+
+def make_url_query(data: Dict) -> str:
+    """Вспомогательная функция для преобразования входных данных
+    в строку параметров URL.
+    """
+    if len(data) == 0:
+        return ''
+    if len(data) == 1:
+        for k in data:
+            return f'?{k}={data[k]}'
+    return '?' + '&'.join(f'{k}={data[k]}' for k in data)

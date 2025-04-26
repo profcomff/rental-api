@@ -13,20 +13,8 @@ from rental_backend.models.db import Item, RentalSession, ItemType, Event, Strik
 from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
 from rental_backend.exceptions import AlreadyExists
-from conftest import model_to_dict
+from tests.conftest import model_to_dict, make_url_query
 # TODO: подумать над багом при teardown test: при ошибке в teardown (точно, если sqlalchemy), у меня не затираются тестовые объекты => некритично, но желательно починить!
-
-
-def make_url_query(data: Dict) -> str:
-    """Вспомогательная функция для преобразования входных данных
-    в строку параметров URL.
-    """
-    if len(data) == 0:
-        return ''
-    if len(data) == 1:
-        for k in data:
-            return f'?{k}={data[k]}'
-    return '?' + '&'.join(f'{k}={data[k]}' for k in data)
 
 
 # New fixtures

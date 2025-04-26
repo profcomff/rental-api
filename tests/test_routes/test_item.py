@@ -1,7 +1,6 @@
 from typing import Dict
 
 import pytest
-from conftest import model_to_dict
 from fastapi.testclient import TestClient
 from sqlalchemy import desc
 from starlette import status
@@ -9,6 +8,7 @@ from starlette import status
 from rental_backend.__main__ import app
 from rental_backend.models.db import Item
 from rental_backend.routes.item import item
+from tests.conftest import model_to_dict, make_url_query
 
 
 client = TestClient(app)
