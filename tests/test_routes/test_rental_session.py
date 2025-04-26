@@ -182,7 +182,7 @@ def rentses_with_end_ts(dbsession, active_rentses) -> RentalSession:
     return active_rentses
 
 
-# Subtests (not call directly by pytest.)
+# Subtests (not call directly by pytest)
 @contextmanager
 def check_object_creation(db_model: BaseDbModel, session, num_of_creations: int=1) -> Generator[None, None, None]:
     """Проверяет создание объекта в БД после события."""
@@ -192,8 +192,15 @@ def check_object_creation(db_model: BaseDbModel, session, num_of_creations: int=
     assert (end_len - start_len) == num_of_creations, f'Убедитесь, что создается {num_of_creations} объектов {db_model.__name__} в БД!'
 
 
-# def check_object_update():  # TODO: написать и протестить в тестах
-#     """Проверяет обновление объекта в БД после события."""
+@contextmanager
+def check_object_update(model_instance: BaseDbModel, session, **final_fields):  # TODO: написать и протестить в тестах
+    """Проверяет обновление объекта в БД после события."""
+    yield
+    session.refresh(model_instance)
+    for field in final_fields:
+        old_field = final_fields[field]
+        new_field = getattr(model_instance, field)
+        assert old_field == new_field, f'Убедитесь, поле {field} модели {model_instance.__class__.__name__} в БД меняется (или нет) корректно!\nБыло -- {old_field}\nСтало -- {new_field}.'
 
 
 # Tests for POST /rental-sessions/{item_type_id}
@@ -238,7 +245,7 @@ def test_create_with_unexisting_id(dbsession, client, base_rentses_url, expire_m
 )
 def test_create_with_invalid_id(dbsession, client, base_rentses_url, expire_mock, invalid_itemtype_id, right_status_code):
     """Проверка логики метода с невалидным item_type_id."""
-    with check_object_creation(RentalSession, dbsession, num_of_creations=0)
+    with check_object_creation(RentalSession, dbsession, num_of_creations=0):
         response = client.post(f'{base_rentses_url}/{invalid_itemtype_id}')
         if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
             pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
@@ -251,11 +258,9 @@ def test_create_internal_server_error(monkeypatch, dbsession, client, available_
         raise Exception("Database error")
 
     monkeypatch.setattr("rental_backend.routes.rental_session.Item.query", mock_db_error)
-    check_creation = check_object_creation(RentalSession, dbsession, num_of_creations=0)
-    next(check_creation)
-    response = client.post(f"{base_rentses_url}/{available_item.type_id}")
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    next(check_creation, None)
+    with check_object_creation(RentalSession, dbsession, num_of_creations=0):
+        response = client.post(f"{base_rentses_url}/{available_item.type_id}")
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 def test_create_and_expire(dbsession, client, base_rentses_url, available_item, expiration_time_mock):
@@ -268,15 +273,9 @@ def test_create_and_expire(dbsession, client, base_rentses_url, available_item, 
 # Tests for PATCH /rental-sessions/{session_id}/start
 def test_start_success(dbsession, client, rentses, base_rentses_url):
     """Проверка логики метода с успешным стартом аренды."""
-    # check_creation = check_object_creation(RentalSession, dbsession)  # TODO: Мб переписать как контекстный менеджер? Типа этот check же в контекст события...
-    # next(check_creation)
-    response = client.patch(f'{base_rentses_url}/{rentses.id}/start')
-    assert response.status_code == status.HTTP_200_OK
-    dbsession.refresh(rentses)
-    assert rentses.status == RentStatus.ACTIVE, 'Убедитесь, что при старте аренды сессия переводится в RentStatus.ACTIVE!'
-    # next(check_creation, None)
-    # dbsession.refresh(available_item)
-    # assert available_item.is_available == False, 'Убедитесь, что Item становится недоступен для аренды после создания RentalSession с ним!'
+    with check_object_update(rentses, dbsession, status=RentStatus.ACTIVE):
+        response = client.patch(f'{base_rentses_url}/{rentses.id}/start')
+        assert response.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.parametrize(
@@ -291,18 +290,14 @@ def test_start_success(dbsession, client, rentses, base_rentses_url):
 )
 def test_start_with_invalid_id(dbsession, client, base_rentses_url, rentses, session_id, right_status_code):
     """Проверка логики метода с невалидным session_id."""
-    # check_creation = check_object_creation(RentalSession, dbsession, num_of_creations=0)  # TODO: мб сделать такой же, но на апдейт?
-    # next(check_creation)
-    response = client.patch(f'{base_rentses_url}/{session_id}/start')
-    if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
-    assert response.status_code == right_status_code
-    dbsession.refresh(rentses)
-    assert rentses.status != RentStatus.ACTIVE, 'Убедитесь, что при невалидном запросе сессия не переводится в RentStatus.ACTIVE!'
-    # next(check_creation, None)
+    with check_object_update(rentses, dbsession, status=rentses.status):
+        response = client.patch(f'{base_rentses_url}/{session_id}/start')
+        if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
+            pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
+        assert response.status_code == right_status_code
 
 
-def test_start_with_unexisting_session(dbsession, client, base_rentses_url, rentses):  # TODO: мб проводить проверку изменений в БД объекта? Это же критично!
+def test_start_with_unexisting_session(dbsession, client, base_rentses_url, rentses):
     """Проверка попытки старта несуществующей сессии аренды."""
     try:
         unexisting_id = RentalSession.query(session=dbsession).order_by(desc('id'))[0].id + 1
@@ -315,15 +310,10 @@ def test_start_with_unexisting_session(dbsession, client, base_rentses_url, rent
 # Tests for PATCH /rental-sessions/{session_id}/return
 def test_return_success(dbsession, client, active_rentses, base_rentses_url):
     """Проверка логики метода с успешным окончанием аренды."""
-    # check_creation = check_object_creation(RentalSession, dbsession)  # TODO: Мб переписать как контекстный менеджер? Типа этот check же в контекст события...
-    # next(check_creation)
-    response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return')
-    assert response.status_code == status.HTTP_200_OK
-    dbsession.refresh(active_rentses)
-    assert active_rentses.status == RentStatus.RETURNED, 'Убедитесь, что при окончании аренды сессия переводится в RentStatus.RETURNED!'
-    # next(check_creation, None)
-    # dbsession.refresh(available_item)
-    # assert available_item.is_available == False, 'Убедитесь, что Item становится недоступен для аренды после создания RentalSession с ним!'
+    avail_item = Item.get(id=active_rentses.item_id, session=dbsession)
+    with check_object_update(active_rentses, dbsession, status=RentStatus.RETURNED), check_object_update(avail_item, dbsession, is_available=False):
+        response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return')
+        assert response.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.parametrize(
@@ -339,18 +329,14 @@ def test_return_success(dbsession, client, active_rentses, base_rentses_url):
 )
 def test_return_with_invalid_id(dbsession, client, base_rentses_url, rentses, session_id, right_status_code):
     """Проверка логики метода с невалидным session_id."""
-    # check_creation = check_object_creation(RentalSession, dbsession, num_of_creations=0)  # TODO: мб сделать такой же, но на апдейт?
-    # next(check_creation)
-    response = client.patch(f'{base_rentses_url}/{session_id}/return')
-    if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
-    assert response.status_code == right_status_code
-    dbsession.refresh(rentses)
-    assert rentses.status != RentStatus.ACTIVE, 'Убедитесь, что при невалидном запросе сессия не переводится в RentStatus.ACTIVE!'
-    # next(check_creation, None)
+    with check_object_update(rentses, dbsession, status=rentses.status):
+        response = client.patch(f'{base_rentses_url}/{session_id}/return')
+        if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
+            pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
+        assert response.status_code == right_status_code
 
 
-def test_return_with_unexisting_session(dbsession, client, base_rentses_url, rentses):  # TODO: мб проводить проверку изменений в БД объекта? Это же критично!
+def test_return_with_unexisting_session(dbsession, client, base_rentses_url, rentses):
     """Проверка попытки старта несуществующей сессии аренды."""
     try:
         unexisting_id = RentalSession.query(session=dbsession).order_by(desc('id'))[0].id + 1
@@ -364,11 +350,12 @@ def test_return_inactive(dbsession, client, rentses, base_rentses_url):
     """Проверка логики метода с попыткой закончить неактивную аренды."""
     # check_creation = check_object_creation(RentalSession, dbsession)  # TODO: Мб переписать как контекстный менеджер? Типа этот check же в контекст события...
     # next(check_creation)
-    old_rent_status = rentses.status
-    response = client.patch(f'{base_rentses_url}/{rentses.id}/return')
-    assert response.status_code == status.HTTP_409_CONFLICT
-    dbsession.refresh(rentses)
-    assert rentses.status == old_rent_status, 'Убедитесь, что при попытке завершить неактивную аренду ее статус не меняется!'
+    # old_rent_status = rentses.status
+    with check_object_update(rentses, dbsession, status=rentses.status):
+        response = client.patch(f'{base_rentses_url}/{rentses.id}/return')
+        assert response.status_code == status.HTTP_409_CONFLICT
+    # dbsession.refresh(rentses)
+    # assert rentses.status == old_rent_status, 'Убедитесь, что при попытке завершить неактивную аренду ее статус не меняется!'
 
 
 @pytest.mark.parametrize(
@@ -386,27 +373,29 @@ def test_return_inactive(dbsession, client, rentses, base_rentses_url):
 )
 def test_return_with_strike(dbsession, client, base_rentses_url, active_rentses, with_strike, strike_reason, right_status_code, strike_created):
     """Проверяет завершение аренды со страйком."""
-    num_of_creations = 1 if strike_created else 0
-    check_creation = check_object_creation(Strike, dbsession, num_of_creations=num_of_creations)
-    next(check_creation)
     query_dict = dict()
     if with_strike is not None:
         query_dict['with_strike'] = with_strike
     if strike_reason is not None:
         query_dict['strike_reason'] = strike_reason
     strike_query = make_url_query(query_dict)
-    response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return{strike_query}')
-    assert response.status_code == right_status_code
-    next(check_creation, None)
+    num_of_creations = 1 if strike_created else 0
+    # check_creation = check_object_creation(Strike, dbsession, num_of_creations=num_of_creations)
+    # next(check_creation)
+    with check_object_creation(Strike, dbsession, num_of_creations):
+        response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return{strike_query}')
+        assert response.status_code == right_status_code
+    # next(check_creation, None)
 
 
 def test_return_with_set_end_ts(dbsession, client, base_rentses_url, rentses_with_end_ts):
     """Проверяет, что при обновлении RentalSession с end_ts не None сохраняется именно существующий, а не создается новый."""
-    old_end_ts = rentses_with_end_ts.end_ts
-    response = client.patch(f'{base_rentses_url}/{rentses_with_end_ts.id}/return')
-    assert response.status_code == status.HTTP_200_OK
-    dbsession.refresh(rentses_with_end_ts)
-    assert rentses_with_end_ts.end_ts == old_end_ts, 'Убедитесь, что при завершении аренды end_ts не меняется, если он не был None!'
+    # old_end_ts = rentses_with_end_ts.end_ts
+    with check_object_update(rentses_with_end_ts, dbsession, end_ts=rentses_with_end_ts.end_ts):
+        response = client.patch(f'{base_rentses_url}/{rentses_with_end_ts.id}/return')
+        assert response.status_code == status.HTTP_200_OK
+    # dbsession.refresh(rentses_with_end_ts)
+    # assert rentses_with_end_ts.end_ts == old_end_ts, 'Убедитесь, что при завершении аренды end_ts не меняется, если он не был None!'
 
 
 # Tests for GET /rental-sessions/user/{user_id}
@@ -623,7 +612,7 @@ def test_update_payload(
         ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
 def test_update_invalid_id(dbsession, client, base_rentses_url, rentses, valid_update_payload, session_id, right_status_code):
-    """Проверка получения сессии по невалидному URL-path."""
+    """Проверка обновления сессии по невалидному URL-path."""
     response = client.patch(f'{base_rentses_url}/{session_id}', json=valid_update_payload)
     assert response.status_code == right_status_code
 
@@ -651,7 +640,7 @@ def test_update_internal_server_error(mocker, client, base_rentses_url, rentses,
         (True, True, True, None, True, True, status.HTTP_200_OK),
         (True, True, True, True, None, True, status.HTTP_200_OK),
         (True, True, True, True, True, None, status.HTTP_200_OK),
-        ('haha', True, True, True, True, True, status.HTTP_422_UNPROCESSABLE_ENTITY),  # FIXME: жду ответа про адекватность поведения (1 -> True)
+        ('haha', True, True, True, True, True, status.HTTP_422_UNPROCESSABLE_ENTITY),
         (True, '', True, True, True, True, status.HTTP_422_UNPROCESSABLE_ENTITY),
         (True, True, -1, True, True, True, status.HTTP_422_UNPROCESSABLE_ENTITY),
         (True, True, True, 4, True, True, status.HTTP_422_UNPROCESSABLE_ENTITY),
@@ -697,6 +686,8 @@ def test_get_url_query(dbsession, client, base_rentses_url, rentses, is_reserved
     # pdb.set_trace()
     response = client.get(f'{base_rentses_url}{make_url_query(query_data)}')
     assert response.status_code == right_status_code
+    if right_status_code == status.HTTP_200_OK:
+        assert isinstance(response.json(), list)
 
 
 def test_get_query_extra_param(dbsession, client, base_rentses_url, rentses):
@@ -708,15 +699,14 @@ def test_get_query_extra_param(dbsession, client, base_rentses_url, rentses):
 
 
 # Tests for DELETE /rental-sessions/{session_id}/cancel
-# TODO: теперь пишем тесты здесь :)
 def test_cancel_success(dbsession, client, base_rentses_url, rentses):
     """Проверяет успешный сценарий отмены аренды."""
-    print()
-    response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
-    assert response.status_code == status.HTTP_200_OK, 'Убедитесь, что аренду можно отменить!'
-    dbsession.refresh(rentses)
-    assert rentses.status == RentStatus.CANCELED, 'Убедитесь, что аренда переводится в статус RentStatus.CANCELED!'
-    assert Item.get(id=rentses.item_id, session=dbsession).is_available == True, 'Убедитесь, что Item становится доступен для повторной аренды!'
+    with check_object_update(rentses, dbsession, status=RentStatus.CANCELED), check_object_update(Item.get(id=rentses.item_id, session=dbsession), dbsession, is_available=True):
+        response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
+        assert response.status_code == status.HTTP_200_OK, 'Убедитесь, что аренду можно отменить!'
+    # dbsession.refresh(rentses)
+    # assert rentses.status == RentStatus.CANCELED, 'Убедитесь, что аренда переводится в статус RentStatus.CANCELED!'
+    # assert Item.get(id=rentses.item_id, session=dbsession).is_available == True, 'Убедитесь, что Item становится доступен для повторной аренды!'
 
 
 @pytest.mark.parametrize(
@@ -739,12 +729,13 @@ def test_cancel_invalid(client, base_rentses_url, session_id, right_status_code)
 
 def test_cancel_wrong_user(dbsession, rentses, base_rentses_url, another_client):  # FIXME: не работает... Вопрос: работает ли мок аутентификации из фикстуры? Как? Почему запрос проходит?(
     """Проверяет случай запроса от пользователя, который не привязан к данной сессии."""
-    old_status = rentses.status
+    # old_status = rentses.status
     # pdb.set_trace()
-    response = another_client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
-    assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что не создатель аренды не может ее отменить!'
-    dbsession.refresh(rentses)
-    assert rentses.status == old_status, 'Убедитесь, что статус аренды не меняется при запросе не от создателя аренды!'
+    with check_object_update(rentses, dbsession, status=rentses.status):
+        response = another_client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
+        assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что не создатель аренды не может ее отменить!'
+    # dbsession.refresh(rentses)
+    # assert rentses.status == old_status, 'Убедитесь, что статус аренды не меняется при запросе не от создателя аренды!'
 
 
 @pytest.mark.parametrize(
@@ -758,9 +749,10 @@ def test_cancel_wrong_status(dbsession, client, base_rentses_url, rentses, new_w
     dbsession.commit()
     dbsession.refresh(rentses)
     # pdb.set_trace()
-    response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
-    assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что нельзя отменить незарезервированную сессию!'
-    assert rentses.status == new_wrong_status, 'Убедитесь, что статус аренды не меняется при некорректном запросе!'
+    with check_object_update(rentses, dbsession, status=new_wrong_status):
+        response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
+        assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что нельзя отменить незарезервированную сессию!'
+    # assert rentses.status == new_wrong_status, 'Убедитесь, что статус аренды не меняется при некорректном запросе!'
 
 
 def test_cancel_internal_server_error(mocker, dbsession, client, base_rentses_url, rentses):
