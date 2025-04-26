@@ -358,22 +358,16 @@ def test_return_with_strike(dbsession, client, base_rentses_url, active_rentses,
         query_dict['strike_reason'] = strike_reason
     strike_query = make_url_query(query_dict)
     num_of_creations = 1 if strike_created else 0
-    # check_creation = check_object_creation(Strike, dbsession, num_of_creations=num_of_creations)
-    # next(check_creation)
     with check_object_creation(Strike, dbsession, num_of_creations):
         response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return{strike_query}')
         assert response.status_code == right_status_code
-    # next(check_creation, None)
 
 
 def test_return_with_set_end_ts(dbsession, client, base_rentses_url, rentses_with_end_ts):
     """Проверяет, что при обновлении RentalSession с end_ts не None сохраняется именно существующий, а не создается новый."""
-    # old_end_ts = rentses_with_end_ts.end_ts
     with check_object_update(rentses_with_end_ts, dbsession, end_ts=rentses_with_end_ts.end_ts):
         response = client.patch(f'{base_rentses_url}/{rentses_with_end_ts.id}/return')
         assert response.status_code == status.HTTP_200_OK
-    # dbsession.refresh(rentses_with_end_ts)
-    # assert rentses_with_end_ts.end_ts == old_end_ts, 'Убедитесь, что при завершении аренды end_ts не меняется, если он не был None!'
 
 
 # Tests for GET /rental-sessions/user/{user_id}
@@ -653,7 +647,6 @@ def test_get_url_query(dbsession, client, base_rentses_url, rentses, is_reserved
     if is_active is not None:
         query_data['is_active'] = is_active
     print(query_data)
-    # pdb.set_trace()
     response = client.get(f'{base_rentses_url}{make_url_query(query_data)}')
     assert response.status_code == right_status_code
     if right_status_code == status.HTTP_200_OK:
@@ -674,9 +667,6 @@ def test_cancel_success(dbsession, client, base_rentses_url, rentses):
     with check_object_update(rentses, dbsession, status=RentStatus.CANCELED), check_object_update(Item.get(id=rentses.item_id, session=dbsession), dbsession, is_available=True):
         response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
         assert response.status_code == status.HTTP_200_OK, 'Убедитесь, что аренду можно отменить!'
-    # dbsession.refresh(rentses)
-    # assert rentses.status == RentStatus.CANCELED, 'Убедитесь, что аренда переводится в статус RentStatus.CANCELED!'
-    # assert Item.get(id=rentses.item_id, session=dbsession).is_available == True, 'Убедитесь, что Item становится доступен для повторной аренды!'
 
 
 @pytest.mark.parametrize(
@@ -699,13 +689,9 @@ def test_cancel_invalid(client, base_rentses_url, session_id, right_status_code)
 
 def test_cancel_wrong_user(dbsession, rentses, base_rentses_url, another_client):
     """Проверяет случай запроса от пользователя, который не привязан к данной сессии."""
-    # old_status = rentses.status
-    # pdb.set_trace()
     with check_object_update(rentses, dbsession, status=rentses.status):
         response = another_client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
         assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что не создатель аренды не может ее отменить!'
-    # dbsession.refresh(rentses)
-    # assert rentses.status == old_status, 'Убедитесь, что статус аренды не меняется при запросе не от создателя аренды!'
 
 
 @pytest.mark.parametrize(
@@ -718,11 +704,9 @@ def test_cancel_wrong_status(dbsession, client, base_rentses_url, rentses, new_w
     RentalSession.update(id=rentses.id, session=dbsession, status=new_wrong_status)
     dbsession.commit()
     dbsession.refresh(rentses)
-    # pdb.set_trace()
     with check_object_update(rentses, dbsession, status=new_wrong_status):
         response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
         assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что нельзя отменить незарезервированную сессию!'
-    # assert rentses.status == new_wrong_status, 'Убедитесь, что статус аренды не меняется при некорректном запросе!'
 
 
 def test_cancel_internal_server_error(mocker, dbsession, client, base_rentses_url, rentses):
