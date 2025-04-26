@@ -14,8 +14,6 @@ from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
 from rental_backend.exceptions import AlreadyExists
 from tests.conftest import model_to_dict, make_url_query
-# TODO: подумать над багом при teardown test: при ошибке в teardown (точно, если sqlalchemy), у меня не затираются тестовые объекты => некритично, но желательно починить!
-
 
 # New fixtures
 @pytest.fixture()
@@ -181,7 +179,7 @@ def check_object_creation(db_model: BaseDbModel, session, num_of_creations: int=
 
 
 @contextmanager
-def check_object_update(model_instance: BaseDbModel, session, **final_fields):  # TODO: написать и протестить в тестах
+def check_object_update(model_instance: BaseDbModel, session, **final_fields):
     """Проверяет обновление объекта в БД после события."""
     yield
     session.refresh(model_instance)
@@ -240,15 +238,12 @@ def test_create_with_invalid_id(dbsession, client, base_rentses_url, expire_mock
         assert response.status_code == right_status_code
 
 
-def test_create_internal_server_error(monkeypatch, dbsession, client, available_item, base_rentses_url):
+def test_create_internal_server_error(mocker, dbsession, client, available_item, base_rentses_url):
     """Проверка логики обработки неожиданных ошибок."""
-    def mock_db_error(*args, **kwargs):
-        raise Exception("Database error")
-
-    monkeypatch.setattr("rental_backend.routes.rental_session.Item.query", mock_db_error)
-    with check_object_creation(RentalSession, dbsession, num_of_creations=0):
-        response = client.post(f"{base_rentses_url}/{available_item.type_id}")
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    error_func = mocker.patch("rental_backend.routes.rental_session.Item.query", side_effect=Exception('Database error'))
+    response = client.post(f"{base_rentses_url}/{available_item.type_id}")
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert error_func.call_count == 1
 
 
 def test_create_and_expire(dbsession, client, base_rentses_url, available_item, expiration_time_mock):
@@ -336,14 +331,9 @@ def test_return_with_unexisting_session(dbsession, client, base_rentses_url, ren
 
 def test_return_inactive(dbsession, client, rentses, base_rentses_url):
     """Проверка логики метода с попыткой закончить неактивную аренды."""
-    # check_creation = check_object_creation(RentalSession, dbsession)  # TODO: Мб переписать как контекстный менеджер? Типа этот check же в контекст события...
-    # next(check_creation)
-    # old_rent_status = rentses.status
     with check_object_update(rentses, dbsession, status=rentses.status):
         response = client.patch(f'{base_rentses_url}/{rentses.id}/return')
         assert response.status_code == status.HTTP_409_CONFLICT
-    # dbsession.refresh(rentses)
-    # assert rentses.status == old_rent_status, 'Убедитесь, что при попытке завершить неактивную аренду ее статус не меняется!'
 
 
 @pytest.mark.parametrize(
@@ -417,14 +407,12 @@ def test_get_for_user_with_invalid_id(dbsession, client, base_rentses_url, rents
         assert len(returned_queue) == 0, 'Убедитесь, что при передаче невалидного user_id возвращается пустой список.'
 
 
-def test_get_for_user_internal_server_error(monkeypatch, client, base_rentses_url, rentses):
+def test_get_for_user_internal_server_error(mocker, client, base_rentses_url, rentses):
     """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    def mock_db_error(*args, **kwargs):
-        raise Exception("Database error")
-
-    monkeypatch.setattr("rental_backend.routes.rental_session.RentalSession.query", mock_db_error)
+    error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.query", side_effect=Exception('Database error'))
     response = client.get(f'{base_rentses_url}/user/{rentses.user_id}')
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert error_func.call_count == 1
 
 
 # Tests for GET /rental-sessions/{session_id}
@@ -455,14 +443,12 @@ def test_retrieve_invalid_id(dbsession, client, base_rentses_url, rentses, sessi
         assert response.json()['id'] == rentses.id, 'Убедитесь, что возвращается та же сессия, что и запрашивается!'
 
 
-def test_retrieve_internal_server_error(monkeypatch, client, base_rentses_url, rentses):
+def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentses):
     """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    def mock_db_error(*args, **kwargs):
-        raise Exception("Database error")
-
-    monkeypatch.setattr("rental_backend.routes.rental_session.RentalSession.get", mock_db_error)
+    error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error'))
     response = client.get(f'{base_rentses_url}/{rentses.id}')
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert error_func.call_count == 1
 
 
 # Tests for PATCH /rental-sessions/{session_id}
@@ -607,13 +593,9 @@ def test_update_invalid_id(dbsession, client, base_rentses_url, rentses, valid_u
 
 def test_update_internal_server_error(mocker, client, base_rentses_url, rentses, valid_update_payload):
     """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    # def mock_db_error(*args, **kwargs):
-    #     raise Exception("Database error")
-
     error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error'))
-    # pdb.set_trace()
     response = client.patch(f'{base_rentses_url}/{rentses.id}', json=valid_update_payload)
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR  # TODO: также добавить такую (и в остальных местах) проверку вызова мок-объекта (что падает именно из-за него).
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1, 'Убедитесь, что ошибка выпадает именно при попытке вызвать RentalSession.get!'
 
 
@@ -715,7 +697,7 @@ def test_cancel_invalid(client, base_rentses_url, session_id, right_status_code)
     assert response.status_code == right_status_code
 
 
-def test_cancel_wrong_user(dbsession, rentses, base_rentses_url, another_client):  # FIXME: не работает... Вопрос: работает ли мок аутентификации из фикстуры? Как? Почему запрос проходит?(
+def test_cancel_wrong_user(dbsession, rentses, base_rentses_url, another_client):
     """Проверяет случай запроса от пользователя, который не привязан к данной сессии."""
     # old_status = rentses.status
     # pdb.set_trace()
@@ -745,11 +727,7 @@ def test_cancel_wrong_status(dbsession, client, base_rentses_url, rentses, new_w
 
 def test_cancel_internal_server_error(mocker, dbsession, client, base_rentses_url, rentses):
     """Проверяет случай возникновения неожиданной ошибки."""
-    # def mock_db_error(*args, **kwargs):
-    #     raise Exception("Database error")
-
     error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error'))
-    # pdb.set_trace()
     response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR  # TODO: также добавить такую (и в остальных местах) проверку вызова мок-объекта (что падает именно из-за него).
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1, 'Убедитесь, что ошибка выпадает именно при попытке вызвать RentalSession.get!'
