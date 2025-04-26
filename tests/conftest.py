@@ -26,11 +26,54 @@ def authlib_user():
         "email": "string",
     }
 
+@pytest.fixture
+def another_authlib_user():
+    """Данные об еще одном пользователе, возвращаемые сервисом auth.
+
+    Составлено на основе: https://clck.ru/3LWzxt
+    """
+    return {
+        "auth_methods": ["string"],
+        "session_scopes": [{"id": 0, "name": "string"}],
+        "user_scopes": [{"id": 0, "name": "string"}],
+        "indirect_groups": [0],
+        "groups": [0],
+        "id": 1,
+        "email": "string",
+    }
+
 
 @pytest.fixture
-def client(mocker, authlib_user):
-    user_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
-    user_mock.return_value = authlib_user
+def authlib_mock(mocker):
+    """Мок верификации AuthLib."""
+    auth_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
+    return auth_mock
+
+
+@pytest.fixture
+def user_mock(authlib_mock, authlib_user):
+    """Мок UnionAuth с возвращением данных для authlib_user."""
+    authlib_mock.return_value = authlib_user
+    return authlib_mock
+
+
+@pytest.fixture
+def another_user_mock(authlib_mock, another_authlib_user):
+    """Мок UnionAuth с возвращением данных для another_authlib_user."""
+    authlib_mock.return_value = another_authlib_user
+    return authlib_mock
+
+
+@pytest.fixture
+def client(user_mock):
+    # app.build_middleware_stack  # TODO: Посмотреть в сторону этих замещений. Тогда тесты и сервис будут разведены. https://github.com/fastapi/fastapi/issues/2495
+    # app.user_middleware
+    client = TestClient(app, raise_server_exceptions=False)
+    return client
+
+
+@pytest.fixture
+def another_client(another_user_mock):
     # app.build_middleware_stack  # TODO: Посмотреть в сторону этих замещений. Тогда тесты и сервис будут разведены. https://github.com/fastapi/fastapi/issues/2495
     # app.user_middleware
     client = TestClient(app, raise_server_exceptions=False)
