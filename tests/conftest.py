@@ -26,6 +26,7 @@ def authlib_user():
         "email": "string",
     }
 
+
 @pytest.fixture
 def another_authlib_user():
     """Данные об еще одном пользователе, возвращаемые сервисом auth.

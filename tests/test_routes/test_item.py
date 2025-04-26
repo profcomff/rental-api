@@ -8,7 +8,7 @@ from starlette import status
 from rental_backend.__main__ import app
 from rental_backend.models.db import Item
 from rental_backend.routes.item import item
-from tests.conftest import model_to_dict, make_url_query
+from tests.conftest import make_url_query, model_to_dict
 
 
 client = TestClient(app)

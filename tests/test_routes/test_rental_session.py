@@ -1,18 +1,18 @@
-from typing import Tuple, List, Generator, Dict, Any
 import datetime
 from contextlib import contextmanager
+from typing import Any, Dict, Generator, List
 
 import pytest
-from starlette import status
-from sqlalchemy.exc import StatementError, DataError
 from sqlalchemy import desc
+from starlette import status
 
+from rental_backend.exceptions import AlreadyExists
 from rental_backend.models.base import BaseDbModel
-from rental_backend.models.db import Item, RentalSession, ItemType, Event, Strike
+from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
-from rental_backend.exceptions import AlreadyExists
-from tests.conftest import model_to_dict, make_url_query
+from tests.conftest import make_url_query, model_to_dict
+
 
 # New fixtures
 @pytest.fixture()
@@ -26,7 +26,9 @@ def expire_mock(mocker):
 @pytest.fixture
 def expiration_time_mock(mocker):
     """Мок для RENTAL_SESSION_EXPIRY, чтобы не ждать в ходе тестов."""
-    fast_expiration = mocker.patch('rental_backend.routes.rental_session.RENTAL_SESSION_EXPIRY', new=datetime.timedelta(seconds=2))
+    fast_expiration = mocker.patch(
+        'rental_backend.routes.rental_session.RENTAL_SESSION_EXPIRY', new=datetime.timedelta(seconds=2)
+    )
     return fast_expiration
 
 
@@ -35,9 +37,7 @@ def item_types(dbsession) -> List[ItemType]:
     """Создает 2 itemType в БД и возвращает их."""
     itemtypes = []
     for ind in range(2):
-        itemtypes.append(
-            ItemType.create(session=dbsession, name=f'Test ItemType {ind}')
-        )
+        itemtypes.append(ItemType.create(session=dbsession, name=f'Test ItemType {ind}'))
     dbsession.commit()
     return itemtypes
 
@@ -47,9 +47,7 @@ def items_with_same_type(dbsession, item_types) -> List[Item]:
     """Создает 2 Item с одним itemType в БД и возвращает их."""
     items = []
     for _ in range(2):
-        items.append(
-            Item.create(session=dbsession, type_id=item_types[0].id)
-        )
+        items.append(Item.create(session=dbsession, type_id=item_types[0].id))
     dbsession.commit()
     return items
 
@@ -59,9 +57,7 @@ def items_with_diff_types(dbsession, item_types) -> List[Item]:
     """Создает 2 Item с разными itemType в БД и возвращает их."""
     items = []
     for ind in range(2):
-        items.append(
-            Item.create(session=dbsession, type_id=item_types[ind].id)
-        )
+        items.append(Item.create(session=dbsession, type_id=item_types[ind].id))
     dbsession.commit()
     return items
 
@@ -162,19 +158,23 @@ def active_rentses(dbsession, rentses) -> RentalSession:
 @pytest.fixture
 def rentses_with_end_ts(dbsession, active_rentses) -> RentalSession:
     """RentalSession с end_ts не None."""
-    RentalSession.update(id=active_rentses.id, session=dbsession, end_ts=datetime.datetime.now(tz=datetime.timezone.utc))
+    RentalSession.update(
+        id=active_rentses.id, session=dbsession, end_ts=datetime.datetime.now(tz=datetime.timezone.utc)
+    )
     dbsession.commit()
     return active_rentses
 
 
 # Subtests (not call directly by pytest)
 @contextmanager
-def check_object_creation(db_model: BaseDbModel, session, num_of_creations: int=1) -> Generator[None, None, None]:
+def check_object_creation(db_model: BaseDbModel, session, num_of_creations: int = 1) -> Generator[None, None, None]:
     """Проверяет создание объекта в БД после события."""
     start_len = db_model.query(session=session).count()
     yield
     end_len = db_model.query(session=session).count()
-    assert (end_len - start_len) == num_of_creations, f'Убедитесь, что создается {num_of_creations} объектов {db_model.__name__} в БД!'
+    assert (
+        end_len - start_len
+    ) == num_of_creations, f'Убедитесь, что создается {num_of_creations} объектов {db_model.__name__} в БД!'
 
 
 @contextmanager
@@ -185,7 +185,9 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
     for field in final_fields:
         old_field = final_fields[field]
         new_field = getattr(model_instance, field)
-        assert old_field == new_field, f'Убедитесь, поле {field} модели {model_instance.__class__.__name__} в БД меняется (или нет) корректно!\nБыло -- {old_field}\nСтало -- {new_field}.'
+        assert (
+            old_field == new_field
+        ), f'Убедитесь, поле {field} модели {model_instance.__class__.__name__} в БД меняется (или нет) корректно!\nБыло -- {old_field}\nСтало -- {new_field}.'
 
 
 # Tests for POST /rental-sessions/{item_type_id}
@@ -195,7 +197,9 @@ def test_create_with_avail_item(dbsession, client, available_item, base_rentses_
         response = client.post(f'{base_rentses_url}/{available_item.type_id}')
         assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(available_item)
-    assert available_item.is_available == False, 'Убедитесь, что Item становится недоступен для аренды после создания RentalSession с ним!'
+    assert (
+        available_item.is_available == False
+    ), 'Убедитесь, что Item становится недоступен для аренды после создания RentalSession с ним!'
 
 
 def test_create_with_no_avail_item(dbsession, client, nonavailable_item, base_rentses_url, expire_mock):
@@ -219,16 +223,19 @@ def test_create_with_unexisting_id(dbsession, client, base_rentses_url, expire_m
 
 
 @pytest.mark.parametrize(
-        'invalid_itemtype_id, right_status_code',
-        [
-            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-            (-1, status.HTTP_404_NOT_FOUND),
-            ('', status.HTTP_405_METHOD_NOT_ALLOWED)],
-        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
+    'invalid_itemtype_id, right_status_code',
+    [
+        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+        (-1, status.HTTP_404_NOT_FOUND),
+        ('', status.HTTP_405_METHOD_NOT_ALLOWED),
+    ],
+    ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
 )
-def test_create_with_invalid_id(dbsession, client, base_rentses_url, expire_mock, invalid_itemtype_id, right_status_code):
+def test_create_with_invalid_id(
+    dbsession, client, base_rentses_url, expire_mock, invalid_itemtype_id, right_status_code
+):
     """Проверка логики метода с невалидным item_type_id."""
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
         response = client.post(f'{base_rentses_url}/{invalid_itemtype_id}')
@@ -239,7 +246,9 @@ def test_create_with_invalid_id(dbsession, client, base_rentses_url, expire_mock
 
 def test_create_internal_server_error(mocker, dbsession, client, available_item, base_rentses_url):
     """Проверка логики обработки неожиданных ошибок."""
-    error_func = mocker.patch("rental_backend.routes.rental_session.Item.query", side_effect=Exception('Database error'))
+    error_func = mocker.patch(
+        "rental_backend.routes.rental_session.Item.query", side_effect=Exception('Database error')
+    )
     response = client.post(f"{base_rentses_url}/{available_item.type_id}")
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1
@@ -249,7 +258,9 @@ def test_create_and_expire(dbsession, client, base_rentses_url, available_item, 
     """Проверка правильного срабатывания check_session_expiration."""
     response = client.post(f'{base_rentses_url}/{available_item.type_id}')
     assert response.status_code == status.HTTP_200_OK
-    assert RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.CANCELED, 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.RESERVED!'
+    assert (
+        RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.CANCELED
+    ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.RESERVED!'
 
 
 # Tests for PATCH /rental-sessions/{session_id}/start
@@ -261,14 +272,15 @@ def test_start_success(dbsession, client, rentses, base_rentses_url):
 
 
 @pytest.mark.parametrize(
-        'session_id, right_status_code',
-        [
-            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-            (-1, status.HTTP_404_NOT_FOUND),
-            ('', status.HTTP_404_NOT_FOUND)],
-        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
+    'session_id, right_status_code',
+    [
+        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+        (-1, status.HTTP_404_NOT_FOUND),
+        ('', status.HTTP_404_NOT_FOUND),
+    ],
+    ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
 )
 def test_start_with_invalid_id(dbsession, client, base_rentses_url, rentses, session_id, right_status_code):
     """Проверка логики метода с невалидным session_id."""
@@ -293,21 +305,24 @@ def test_start_with_unexisting_session(dbsession, client, base_rentses_url, rent
 def test_return_success(dbsession, client, active_rentses, base_rentses_url):
     """Проверка логики метода с успешным окончанием аренды."""
     avail_item = Item.get(id=active_rentses.item_id, session=dbsession)
-    with check_object_update(active_rentses, dbsession, status=RentStatus.RETURNED), check_object_update(avail_item, dbsession, is_available=False):
+    with (
+        check_object_update(active_rentses, dbsession, status=RentStatus.RETURNED),
+        check_object_update(avail_item, dbsession, is_available=False),
+    ):
         response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return')
         assert response.status_code == status.HTTP_200_OK
 
 
 @pytest.mark.parametrize(
-        'session_id, right_status_code',
-        [
-            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-            (-1, status.HTTP_404_NOT_FOUND),
-            ('', status.HTTP_404_NOT_FOUND)
-        ],
-        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
+    'session_id, right_status_code',
+    [
+        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+        (-1, status.HTTP_404_NOT_FOUND),
+        ('', status.HTTP_404_NOT_FOUND),
+    ],
+    ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
 )
 def test_return_with_invalid_id(dbsession, client, base_rentses_url, rentses, session_id, right_status_code):
     """Проверка логики метода с невалидным session_id."""
@@ -336,19 +351,29 @@ def test_return_inactive(dbsession, client, rentses, base_rentses_url):
 
 
 @pytest.mark.parametrize(
-        'with_strike, strike_reason, right_status_code, strike_created',
-        [
-            (None, None, status.HTTP_200_OK, False),
-            (True, 'Test case', status.HTTP_200_OK, True),
-            (True, None, status.HTTP_200_OK, True),
-            (False, 'Test case', status.HTTP_200_OK, False),
-            (3, 'Test case', status.HTTP_422_UNPROCESSABLE_ENTITY, False),
-            ('hihi', 'Test case', status.HTTP_422_UNPROCESSABLE_ENTITY, False),
-            ('hoho/haha', 'Test case', status.HTTP_422_UNPROCESSABLE_ENTITY, False),
-        ],
-        ids=['empty', 'full_valid', 'only_with', 'only_reason', 'invalid_with_big_num', 'invalid_with_text', 'invalid_with_trailing_slash']
+    'with_strike, strike_reason, right_status_code, strike_created',
+    [
+        (None, None, status.HTTP_200_OK, False),
+        (True, 'Test case', status.HTTP_200_OK, True),
+        (True, None, status.HTTP_200_OK, True),
+        (False, 'Test case', status.HTTP_200_OK, False),
+        (3, 'Test case', status.HTTP_422_UNPROCESSABLE_ENTITY, False),
+        ('hihi', 'Test case', status.HTTP_422_UNPROCESSABLE_ENTITY, False),
+        ('hoho/haha', 'Test case', status.HTTP_422_UNPROCESSABLE_ENTITY, False),
+    ],
+    ids=[
+        'empty',
+        'full_valid',
+        'only_with',
+        'only_reason',
+        'invalid_with_big_num',
+        'invalid_with_text',
+        'invalid_with_trailing_slash',
+    ],
 )
-def test_return_with_strike(dbsession, client, base_rentses_url, active_rentses, with_strike, strike_reason, right_status_code, strike_created):
+def test_return_with_strike(
+    dbsession, client, base_rentses_url, active_rentses, with_strike, strike_reason, right_status_code, strike_created
+):
     """Проверяет завершение аренды со страйком."""
     query_dict = dict()
     if with_strike is not None:
@@ -374,19 +399,21 @@ def test_get_for_user_success(dbsession, client, base_rentses_url, rentses):
     """Попытка успешно получить список аренд пользователя."""
     response = client.get(f'{base_rentses_url}/user/{rentses.user_id}')
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.json()) == len(RentalSession.query(session=dbsession).filter(RentalSession.user_id == rentses.user_id).all()), 'Убедитесь, что возвращаются все аренды пользователя!'
+    assert len(response.json()) == len(
+        RentalSession.query(session=dbsession).filter(RentalSession.user_id == rentses.user_id).all()
+    ), 'Убедитесь, что возвращаются все аренды пользователя!'
 
 
 @pytest.mark.parametrize(
-        'user_id, right_status_code',
-        [
-            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-            (-1, status.HTTP_200_OK),
-            ('', status.HTTP_422_UNPROCESSABLE_ENTITY)
-        ],
-        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
+    'user_id, right_status_code',
+    [
+        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+        (-1, status.HTTP_200_OK),
+        ('', status.HTTP_422_UNPROCESSABLE_ENTITY),
+    ],
+    ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty'],
 )
 def test_get_for_user_with_invalid_id(dbsession, client, base_rentses_url, rentses, user_id, right_status_code):
     """Проверка логики метода с невалидным user_id."""
@@ -402,7 +429,9 @@ def test_get_for_user_with_invalid_id(dbsession, client, base_rentses_url, rents
 
 def test_get_for_user_internal_server_error(mocker, client, base_rentses_url, rentses):
     """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.query", side_effect=Exception('Database error'))
+    error_func = mocker.patch(
+        "rental_backend.routes.rental_session.RentalSession.query", side_effect=Exception('Database error')
+    )
     response = client.get(f'{base_rentses_url}/user/{rentses.user_id}')
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1
@@ -415,18 +444,19 @@ def test_retrieve_success(dbsession, client, base_rentses_url, rentses):
     assert response.status_code == status.HTTP_200_OK
     assert rentses == RentalSession.get(id=response.json()['id'], session=dbsession)
 
+
 @pytest.mark.xfail(reason='Ждет issue #40. Потом удалить маркер и проверить тесты.')
 @pytest.mark.parametrize(
-        'session_id, right_status_code',
-        [
-            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-            (-1, status.HTTP_200_OK),
-            ('', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('-1?hoho=hihi', status.HTTP_422_UNPROCESSABLE_ENTITY)
-        ],
-        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
+    'session_id, right_status_code',
+    [
+        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+        (-1, status.HTTP_200_OK),
+        ('', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('-1?hoho=hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+    ],
+    ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
 def test_retrieve_invalid_id(dbsession, client, base_rentses_url, rentses, session_id, right_status_code):
     """Проверка получения сессии по невалидному URL-path."""
@@ -438,7 +468,9 @@ def test_retrieve_invalid_id(dbsession, client, base_rentses_url, rentses, sessi
 
 def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentses):
     """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error'))
+    error_func = mocker.patch(
+        "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
+    )
     response = client.get(f'{base_rentses_url}/{rentses.id}')
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1
@@ -455,24 +487,32 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
                 "actual_return_ts": "2025-04-18T23:32:30.589Z",
                 "admin_close_id": 0,
             },
-            status.HTTP_200_OK, True,
+            status.HTTP_200_OK,
+            True,
         ),
         (
             {"end_ts": "2025-04-18T23:32:30.589Z", "actual_return_ts": "2025-04-18T23:32:30.589Z", "admin_close_id": 0},
-            status.HTTP_200_OK, True,
+            status.HTTP_200_OK,
+            True,
         ),
         (
             {"status": "reserved", "actual_return_ts": "2025-04-18T23:32:30.589Z", "admin_close_id": 0},
-            status.HTTP_200_OK, True,
+            status.HTTP_200_OK,
+            True,
         ),
-        ({"status": "reserved", "end_ts": "2025-04-18T23:32:30.589Z", "admin_close_id": 0}, status.HTTP_200_OK, True,),
+        (
+            {"status": "reserved", "end_ts": "2025-04-18T23:32:30.589Z", "admin_close_id": 0},
+            status.HTTP_200_OK,
+            True,
+        ),
         (
             {
                 "status": "reserved",
                 "end_ts": "2025-04-18T23:32:30.589Z",
                 "actual_return_ts": "2025-04-18T23:32:30.589Z",
             },
-            status.HTTP_200_OK, True,
+            status.HTTP_200_OK,
+            True,
         ),
         (
             {
@@ -482,7 +522,8 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
                 "admin_close_id": 0,
                 "extra": "oops!",
             },
-            status.HTTP_200_OK, True,
+            status.HTTP_200_OK,
+            True,
         ),
         (
             {
@@ -491,7 +532,8 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
                 "actual_return_ts": "2025-04-18T23:32:30.589Z",
                 "admin_close_id": 0,
             },
-            status.HTTP_422_UNPROCESSABLE_ENTITY, False,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            False,
         ),
         (
             {
@@ -500,7 +542,8 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
                 "actual_return_ts": "2025-04-18T23:32:30.589Z",
                 "admin_close_id": 0,
             },
-            status.HTTP_422_UNPROCESSABLE_ENTITY, False,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            False,
         ),
         (
             {
@@ -509,7 +552,8 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
                 "actual_return_ts": "ha-ha",
                 "admin_close_id": 0,
             },
-            status.HTTP_422_UNPROCESSABLE_ENTITY, False,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            False,
         ),
         (
             {
@@ -518,12 +562,18 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
                 "actual_return_ts": "2025-04-18T23:32:30.589Z",
                 "admin_close_id": "boba",
             },
-            status.HTTP_422_UNPROCESSABLE_ENTITY, False,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            False,
         ),
-        ({}, status.HTTP_409_CONFLICT, False,),
+        (
+            {},
+            status.HTTP_409_CONFLICT,
+            False,
+        ),
         (
             {"status": "reserved", "end_ts": None, "actual_return_ts": None, "admin_close_id": None},
-            status.HTTP_409_CONFLICT, False,
+            status.HTTP_409_CONFLICT,
+            False,
         ),
         (
             {
@@ -532,7 +582,8 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
                 "actual_return_ts": None,
                 "admin_close_id": None,
             },
-            status.HTTP_200_OK, True,
+            status.HTTP_200_OK,
+            True,
         ),
     ],
     ids=[
@@ -551,9 +602,7 @@ def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentse
         'part_old_payload',
     ],
 )
-def test_update_payload(
-    dbsession, rentses, client, base_rentses_url, payload, right_status_code, update_in_db
-):
+def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, right_status_code, update_in_db):
     """Проверка поведения при разном теле запроса."""
     old_model_fields = model_to_dict(rentses)
     response = client.patch(f"{base_rentses_url}/{rentses.id}", json=payload)
@@ -567,18 +616,20 @@ def test_update_payload(
 
 
 @pytest.mark.parametrize(
-        'session_id, right_status_code',
-        [
-            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-            (-1, status.HTTP_404_NOT_FOUND),
-            ('', status.HTTP_405_METHOD_NOT_ALLOWED),
-            ('-1?hoho=hihi', status.HTTP_404_NOT_FOUND)
-        ],
-        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
+    'session_id, right_status_code',
+    [
+        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+        (-1, status.HTTP_404_NOT_FOUND),
+        ('', status.HTTP_405_METHOD_NOT_ALLOWED),
+        ('-1?hoho=hihi', status.HTTP_404_NOT_FOUND),
+    ],
+    ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
-def test_update_invalid_id(dbsession, client, base_rentses_url, rentses, valid_update_payload, session_id, right_status_code):
+def test_update_invalid_id(
+    dbsession, client, base_rentses_url, rentses, valid_update_payload, session_id, right_status_code
+):
     """Проверка обновления сессии по невалидному URL-path."""
     response = client.patch(f'{base_rentses_url}/{session_id}', json=valid_update_payload)
     assert response.status_code == right_status_code
@@ -586,7 +637,9 @@ def test_update_invalid_id(dbsession, client, base_rentses_url, rentses, valid_u
 
 def test_update_internal_server_error(mocker, client, base_rentses_url, rentses, valid_update_payload):
     """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error'))
+    error_func = mocker.patch(
+        "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
+    )
     response = client.patch(f'{base_rentses_url}/{rentses.id}', json=valid_update_payload)
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1, 'Убедитесь, что ошибка выпадает именно при попытке вызвать RentalSession.get!'
@@ -630,7 +683,19 @@ def test_update_internal_server_error(mocker, client, base_rentses_url, rentses,
         'valid_all_False',
     ],
 )
-def test_get_url_query(dbsession, client, base_rentses_url, rentses, is_reserved, is_canceled, is_dismissed, is_overdue, is_returned, is_active, right_status_code):
+def test_get_url_query(
+    dbsession,
+    client,
+    base_rentses_url,
+    rentses,
+    is_reserved,
+    is_canceled,
+    is_dismissed,
+    is_overdue,
+    is_returned,
+    is_active,
+    right_status_code,
+):
     """Проверка получения сессий при разных URL-query."""
     query_data = dict()
     if is_reserved is not None:
@@ -657,28 +722,33 @@ def test_get_query_extra_param(dbsession, client, base_rentses_url, rentses):
     extra_response = client.get(f'{base_rentses_url}?hehe=True')
     assert extra_response.status_code == status.HTTP_200_OK
     valid_response = client.get(f'{base_rentses_url}')
-    assert len(extra_response.json()) == len(valid_response.json()), 'Убедитесь, что экстра параметр не меняет поведения хэндлера!'
+    assert len(extra_response.json()) == len(
+        valid_response.json()
+    ), 'Убедитесь, что экстра параметр не меняет поведения хэндлера!'
 
 
 # Tests for DELETE /rental-sessions/{session_id}/cancel
 def test_cancel_success(dbsession, client, base_rentses_url, rentses):
     """Проверяет успешный сценарий отмены аренды."""
-    with check_object_update(rentses, dbsession, status=RentStatus.CANCELED), check_object_update(Item.get(id=rentses.item_id, session=dbsession), dbsession, is_available=True):
+    with (
+        check_object_update(rentses, dbsession, status=RentStatus.CANCELED),
+        check_object_update(Item.get(id=rentses.item_id, session=dbsession), dbsession, is_available=True),
+    ):
         response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
         assert response.status_code == status.HTTP_200_OK, 'Убедитесь, что аренду можно отменить!'
 
 
 @pytest.mark.parametrize(
-        'session_id, right_status_code',
-        [
-            ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-            (-1, status.HTTP_404_NOT_FOUND),
-            ('', status.HTTP_404_NOT_FOUND),
-            ('-1?hoho=hihi', status.HTTP_405_METHOD_NOT_ALLOWED)
-        ],
-        ids= ['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
+    'session_id, right_status_code',
+    [
+        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
+        (-1, status.HTTP_404_NOT_FOUND),
+        ('', status.HTTP_404_NOT_FOUND),
+        ('-1?hoho=hihi', status.HTTP_405_METHOD_NOT_ALLOWED),
+    ],
+    ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
 def test_cancel_invalid(client, base_rentses_url, session_id, right_status_code):
     """Проверяет случай запроса по невалидному session_id."""
@@ -690,13 +760,15 @@ def test_cancel_wrong_user(dbsession, rentses, base_rentses_url, another_client)
     """Проверяет случай запроса от пользователя, который не привязан к данной сессии."""
     with check_object_update(rentses, dbsession, status=rentses.status):
         response = another_client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
-        assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что не создатель аренды не может ее отменить!'
+        assert (
+            response.status_code == status.HTTP_403_FORBIDDEN
+        ), 'Убедитесь, что не создатель аренды не может ее отменить!'
 
 
 @pytest.mark.parametrize(
     'new_wrong_status',
     [RentStatus.ACTIVE, RentStatus.CANCELED, RentStatus.OVERDUE, RentStatus.RETURNED, RentStatus.DISMISSED],
-    ids=['active', 'canceled', 'overdue', 'returned', 'dismissed']
+    ids=['active', 'canceled', 'overdue', 'returned', 'dismissed'],
 )
 def test_cancel_wrong_status(dbsession, client, base_rentses_url, rentses, new_wrong_status):
     """Проверяет случай запроса на отмену незарезервированной сессии."""
@@ -705,12 +777,16 @@ def test_cancel_wrong_status(dbsession, client, base_rentses_url, rentses, new_w
     dbsession.refresh(rentses)
     with check_object_update(rentses, dbsession, status=new_wrong_status):
         response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
-        assert response.status_code == status.HTTP_403_FORBIDDEN, 'Убедитесь, что нельзя отменить незарезервированную сессию!'
+        assert (
+            response.status_code == status.HTTP_403_FORBIDDEN
+        ), 'Убедитесь, что нельзя отменить незарезервированную сессию!'
 
 
 def test_cancel_internal_server_error(mocker, dbsession, client, base_rentses_url, rentses):
     """Проверяет случай возникновения неожиданной ошибки."""
-    error_func = mocker.patch("rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error'))
+    error_func = mocker.patch(
+        "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
+    )
     response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1, 'Убедитесь, что ошибка выпадает именно при попытке вызвать RentalSession.get!'

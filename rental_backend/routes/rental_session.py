@@ -7,7 +7,7 @@ from fastapi_sqlalchemy import db
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
-from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikeGet, StrikePost
+from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
 from rental_backend.utils.action import ActionLogger
 
 
