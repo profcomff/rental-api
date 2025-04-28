@@ -13,7 +13,7 @@ from rental_backend.utils.action import ActionLogger
 
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
 
-RENTAL_SESSION_EXPIRY = datetime.timedelta(seconds=30)
+RENTAL_SESSION_EXPIRY = datetime.timedelta(minutes=10)
 
 
 async def check_session_expiration(session_id: int):
