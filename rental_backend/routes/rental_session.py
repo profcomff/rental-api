@@ -13,7 +13,7 @@ from rental_backend.utils.action import ActionLogger
 
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
 
-RENTAL_SESSION_EXPIRY = datetime.timedelta(minutes=10)
+RENTAL_SESSION_EXPIRY = datetime.timedelta(seconds=30)
 
 
 async def check_session_expiration(session_id: int):
@@ -28,7 +28,7 @@ async def check_session_expiration(session_id: int):
         RentalSession.update(
             session=db.session,
             id=session_id,
-            status=RentStatus.CANCELED,
+            status=RentStatus.OVERDUE,
         )
         Item.update(session=db.session, id=session.item_id, is_available=True)
         ActionLogger.log_event(
@@ -36,7 +36,7 @@ async def check_session_expiration(session_id: int):
             admin_id=None,
             session_id=session.id,
             action_type="EXPIRE_SESSION",
-            details={"status": RentStatus.CANCELED},
+            details={"status": RentStatus.OVERDUE},
         )
 
 
