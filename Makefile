@@ -19,7 +19,7 @@ format:
 	source ./venv/bin/activate && black ./migrations
 
 db:
-	docker run -d -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust --name db-rental-backend postgres:15
+	docker run -d -p 5434:5432 -e POSTGRES_HOST_AUTH_METHOD=trust --name db-rental-backend postgres:15
 
 migrate:
 	source ./venv/bin/activate && alembic upgrade head

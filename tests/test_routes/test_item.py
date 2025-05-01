@@ -33,12 +33,15 @@ def test_create_item(client, dbsession, response_status):
         (3, status.HTTP_404_NOT_FOUND),
     ],
 )
-def test_get_item(client, dbsession, item_fixture, item_n, response_status):
-    items_list = [item_fixture] 
-    item_id = items_list[item_n].id if item_n < len(items_list) else -1
+def test_get_item(client, dbsession, items, item_n, response_status):
+    items_list = (
+        dbsession.query(Item).filter(Item.type_id == items[item_n].type_id).one_or_none()
+    )
+    item_id = -1
+    if items_list:
+        item_id = items_list.id
     get_response = client.get(f'{url}/{item_id}')
     assert get_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
         json_response = get_response.json()
         assert json_response["type_id"] is None
-

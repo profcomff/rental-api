@@ -36,47 +36,29 @@ def dbsession():
     session.close()
 
 
-@pytest.fixture()
-def item_type_fixture(dbsession):
-    item_type = ItemType(id=0, name='Test ItemType')
-    dbsession.add(item_type)
-    dbsession.commit()
-    yield item_type
-    dbsession.refresh(item_type)
-    dbsession.delete(item_type)
-    dbsession.commit()
-
-
-@pytest.fixture(scope="function")
-def item_fixture(dbsession, item_type_fixture):
-    item = Item(type_id=item_type_fixture.id)
-    dbsession.add(item)
-    dbsession.commit()
-    yield item
-    dbsession.delete(item)
-    dbsession.commit()
-
-
-@pytest.fixture(scope="function")
-def items_with_types(dbsession):
-    item_types = [
-        ItemType(name="Type1"),
-        ItemType(name="Type2"),
+@pytest.fixture(scope='function')
+def items(dbsession):
+    """
+    Creates 4 lecturers(one with flag is_deleted=True)
+    """
+    items_data = [
+        (9900, True),
+        (8999, True),
+        (8998, True),
     ]
-    dbsession.add_all(item_types)
-    dbsession.commit()
-
     items = [
-        Item(type_id=item_types[0].id),
-        Item(type_id=item_types[1].id),
+        Item(type_id=ftype, is_available=available)
+        for ftype, available in items_data
     ]
-    dbsession.add_all(items)
-    dbsession.commit()
-
-    yield items, item_types
-
+    items.append(
+        Item(type_id=8997, is_available=True)
+    )
+    items[-1].is_deleted = True
     for item in items:
+        dbsession.add(item)
+    dbsession.commit()
+    yield items
+    for item in items:
+        dbsession.refresh(item)
         dbsession.delete(item)
-    for item_type in item_types:
-        dbsession.delete(item_type)
     dbsession.commit()
