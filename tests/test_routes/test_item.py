@@ -23,3 +23,22 @@ def test_create_item(client, dbsession, response_status):
         dbsession.commit()
         item = dbsession.query(Item).filter(Item.id == 0).one_or_none()
         assert item is None
+
+@pytest.mark.parametrize(
+    'item_n,response_status',
+    [
+        (0, status.HTTP_200_OK),
+        (1, status.HTTP_200_OK),
+        (2, status.HTTP_200_OK),
+        (3, status.HTTP_404_NOT_FOUND),
+    ],
+)
+def test_get_item(client, dbsession, item_fixture, item_n, response_status):
+    items_list = [item_fixture] 
+    item_id = items_list[item_n].id if item_n < len(items_list) else -1
+    get_response = client.get(f'{url}/{item_id}')
+    assert get_response.status_code == response_status
+    if response_status == status.HTTP_200_OK:
+        json_response = get_response.json()
+        assert json_response["type_id"] is None
+
