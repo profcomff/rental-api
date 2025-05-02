@@ -68,18 +68,18 @@ def base_rentses_url(base_test_url: str) -> str:
     return f'{base_test_url}{rental_session.prefix}'
 
 
-@pytest.fixture
-def available_item(dbsession, item_fixture) -> Item:
-    """Item, доступный для аренды.
+# @pytest.fixture
+# def available_item(dbsession, item_fixture) -> Item:
+#     """Item, доступный для аренды.
 
-    .. note::
-        Очистка производится в dbsession.
-    """
-    if item_fixture.is_available == False:
-        Item.update(item_fixture.id, session=dbsession, is_available=True)
-        dbsession.refresh(item_fixture)
-        dbsession.commit()
-    return item_fixture
+#     .. note::
+#         Очистка производится в dbsession.
+#     """
+#     if item_fixture.is_available == False:
+#         Item.update(item_fixture.id, session=dbsession, is_available=True)
+#         dbsession.refresh(item_fixture)
+#         dbsession.commit()
+#     return item_fixture
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ def valid_update_payload() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def rentses(dbsession, available_item, authlib_user) -> RentalSession:
+def rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
     """Экземпляр RentalSession, создаваемый в POST /rental_session.
 
     .. note::
@@ -117,12 +117,13 @@ def rentses(dbsession, available_item, authlib_user) -> RentalSession:
     rent = RentalSession.create(
         session=dbsession,
         user_id=authlib_user.get("id"),
-        item_id=available_item.id,
+        item_id=item_fixture.id,
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
     )
-    Item.update(id=available_item.id, session=dbsession, is_available=False)
-    dbsession.add(rent)
+    # Item.update(id=item_fixture.id, session=dbsession, is_available=False)
+    item_fixture.is_available = False
+    dbsession.add(rent, item_fixture)
     dbsession.commit()
     return rent
 
@@ -191,14 +192,17 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
 
 
 # Tests for POST /rental-sessions/{item_type_id}
-def test_create_with_avail_item(dbsession, client, available_item, base_rentses_url, expire_mock):
+def test_create_with_avail_item(dbsession, client, item_fixture, base_rentses_url, expire_mock):
     """Проверка логики метода с исходно доступным предметом в БД."""
+    item_fixture.is_available = True
+    dbsession.add(item_fixture)
+    dbsession.commit()
     with check_object_creation(RentalSession, dbsession):
-        response = client.post(f'{base_rentses_url}/{available_item.type_id}')
+        response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
         assert response.status_code == status.HTTP_200_OK
-    dbsession.refresh(available_item)
+    dbsession.refresh(item_fixture)
     assert (
-        available_item.is_available == False
+        item_fixture.is_available == False
     ), 'Убедитесь, что Item становится недоступен для аренды после создания RentalSession с ним!'
 
 
@@ -244,23 +248,29 @@ def test_create_with_invalid_id(
         assert response.status_code == right_status_code
 
 
-def test_create_internal_server_error(mocker, dbsession, client, available_item, base_rentses_url):
+def test_create_internal_server_error(mocker, dbsession, client, item_fixture, base_rentses_url):
     """Проверка логики обработки неожиданных ошибок."""
+    item_fixture.is_available = True
+    dbsession.add(item_fixture)
+    dbsession.commit()
     error_func = mocker.patch(
         "rental_backend.routes.rental_session.Item.query", side_effect=Exception('Database error')
     )
-    response = client.post(f"{base_rentses_url}/{available_item.type_id}")
+    response = client.post(f"{base_rentses_url}/{item_fixture.type_id}")
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1
 
 
-def test_create_and_expire(dbsession, client, base_rentses_url, available_item, expiration_time_mock):
+def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture, expiration_time_mock):
     """Проверка правильного срабатывания check_session_expiration."""
-    response = client.post(f'{base_rentses_url}/{available_item.type_id}')
+    item_fixture.is_available = True
+    dbsession.add(item_fixture)
+    dbsession.commit()
+    response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
     assert response.status_code == status.HTTP_200_OK
     assert (
-        RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.CANCELED
-    ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.RESERVED!'
+        RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.OVERDUE
+    ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.OVERDUE!'
 
 
 # Tests for PATCH /rental-sessions/{session_id}/start
