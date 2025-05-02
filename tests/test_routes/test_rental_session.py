@@ -69,17 +69,6 @@ def base_rentses_url(base_test_url: str) -> str:
 
 
 @pytest.fixture
-def valid_update_payload() -> Dict[str, Any]:
-    """Валидный словарь параметров для обновления RentalSession."""
-    return {
-        "status": "reserved",
-        "end_ts": "2025-04-18T23:32:30.589Z",
-        "actual_return_ts": "2025-04-18T23:32:30.589Z",
-        "admin_close_id": 0,
-    }
-
-
-@pytest.fixture
 def rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
     """Экземпляр RentalSession, создаваемый в POST /rental_session.
 
@@ -93,7 +82,6 @@ def rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
     )
-    # Item.update(id=item_fixture.id, session=dbsession, is_available=False)
     item_fixture.is_available = False
     dbsession.add(rent, item_fixture)
     dbsession.commit()
@@ -613,15 +601,27 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
 def test_update_invalid_id(
-    dbsession, client, base_rentses_url, rentses, valid_update_payload, session_id, right_status_code
+    dbsession, client, base_rentses_url, rentses, session_id, right_status_code
 ):
     """Проверка обновления сессии по невалидному URL-path."""
+    valid_update_payload = {
+        "status": "reserved",
+        "end_ts": "2025-04-18T23:32:30.589Z",
+        "actual_return_ts": "2025-04-18T23:32:30.589Z",
+        "admin_close_id": 0,
+    }
     response = client.patch(f'{base_rentses_url}/{session_id}', json=valid_update_payload)
     assert response.status_code == right_status_code
 
 
-def test_update_internal_server_error(mocker, client, base_rentses_url, rentses, valid_update_payload):
+def test_update_internal_server_error(mocker, client, base_rentses_url, rentses):
     """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
+    valid_update_payload = {
+        "status": "reserved",
+        "end_ts": "2025-04-18T23:32:30.589Z",
+        "actual_return_ts": "2025-04-18T23:32:30.589Z",
+        "admin_close_id": 0,
+    }
     error_func = mocker.patch(
         "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
     )
