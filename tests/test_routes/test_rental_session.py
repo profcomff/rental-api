@@ -104,14 +104,18 @@ def another_rentses(dbsession, items_with_same_type, another_authlib_user) -> Re
 
 
 @pytest.fixture
-def active_rentses(dbsession, rentses) -> RentalSession:
+def active_rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
     """Начатая сессия аренды."""
-    try:
-        RentalSession.update(id=rentses.id, session=dbsession, status=RentStatus.ACTIVE)
-    except AlreadyExists:
-        return rentses
+    rent = RentalSession.create(
+        session=dbsession,
+        user_id=authlib_user.get("id"),
+        item_id=item_fixture.id,
+        status=RentStatus.ACTIVE,
+    )
+    item_fixture.is_available = False
+    dbsession.add(rent, item_fixture)
     dbsession.commit()
-    return rentses
+    return rent
 
 
 @pytest.fixture
