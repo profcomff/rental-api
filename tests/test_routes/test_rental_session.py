@@ -144,41 +144,26 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
 
 
 # Tests for POST /rental-sessions/{item_type_id}
-def test_create_with_avail_item(dbsession, client, item_fixture, base_rentses_url, expire_mock):
-    """Проверка логики метода с исходно доступным предметом в БД."""
-    item_fixture.is_available = True
+@pytest.mark.parametrize(
+        'start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations',
+        [
+            (True, False, 0, status.HTTP_200_OK, 1),
+            (False, False, 0, status.HTTP_404_NOT_FOUND, 0),
+            (True, True, 1, status.HTTP_404_NOT_FOUND, 0)
+        ],
+        ids=['avail_item', 'not_avail_item', 'unexisting_itemtype']
+)
+def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url, expire_mock, start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations):
+    item_fixture.is_available = start_item_avail
     dbsession.add(item_fixture)
     dbsession.commit()
-    with check_object_creation(RentalSession, dbsession):
-        response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
-        assert response.status_code == status.HTTP_200_OK
-    dbsession.refresh(item_fixture)
-    assert (
-        item_fixture.is_available == False
-    ), 'Убедитесь, что Item становится недоступен для аренды после создания RentalSession с ним!'
-
-
-def test_create_with_no_avail_item(dbsession, client, item_fixture, base_rentses_url, expire_mock):
-    """Проверка логики метода без исходно доступных предметов."""
-    item_fixture.is_available = False
-    dbsession.add(item_fixture)
-    dbsession.commit()
-    with check_object_creation(RentalSession, dbsession, num_of_creations=0):
-        response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-    dbsession.refresh(item_fixture)
-    assert item_fixture.is_available == False, 'Убедитесь, что Item остается недоступен для аренды!'
-
-
-def test_create_with_unexisting_id(dbsession, client, base_rentses_url, expire_mock):
-    """Проверка логики метода с несуществующим item_type_id."""
     try:
-        unexisting_type_id = ItemType.query(session=dbsession).order_by(desc('id'))[0].id + 1
+        type_id = ItemType.query(session=dbsession).all()[itemtype_list_ind].id
     except IndexError:
-        unexisting_type_id = 1
-    with check_object_creation(RentalSession, dbsession, num_of_creations=0):
-        response = client.post(f'{base_rentses_url}/{unexisting_type_id}')
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        type_id = ItemType.query(session=dbsession).order_by(desc('id'))[0].id + 1
+    with check_object_creation(RentalSession, dbsession, num_of_creations=num_of_creations), check_object_update(item_fixture, session=dbsession, is_available=end_item_avail):
+        response = client.post(f'{base_rentses_url}/{type_id}')
+        assert response.status_code == right_status_code
 
 
 @pytest.mark.parametrize(
