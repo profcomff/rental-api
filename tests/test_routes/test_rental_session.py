@@ -118,16 +118,6 @@ def active_rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
     return rent
 
 
-@pytest.fixture
-def rentses_with_end_ts(dbsession, active_rentses) -> RentalSession:
-    """RentalSession с end_ts не None."""
-    RentalSession.update(
-        id=active_rentses.id, session=dbsession, end_ts=datetime.datetime.now(tz=datetime.timezone.utc)
-    )
-    dbsession.commit()
-    return active_rentses
-
-
 # Subtests (not call directly by pytest)
 @contextmanager
 def check_object_creation(db_model: BaseDbModel, session, num_of_creations: int = 1) -> Generator[None, None, None]:
@@ -362,10 +352,13 @@ def test_return_with_strike(
         assert response.status_code == right_status_code
 
 
-def test_return_with_set_end_ts(dbsession, client, base_rentses_url, rentses_with_end_ts):
+def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rentses):
     """Проверяет, что при обновлении RentalSession с end_ts не None сохраняется именно существующий, а не создается новый."""
-    with check_object_update(rentses_with_end_ts, dbsession, end_ts=rentses_with_end_ts.end_ts):
-        response = client.patch(f'{base_rentses_url}/{rentses_with_end_ts.id}/return')
+    active_rentses.end_ts = datetime.datetime.now(tz=datetime.timezone.utc)
+    dbsession.add(active_rentses)
+    dbsession.commit()
+    with check_object_update(active_rentses, dbsession, end_ts=active_rentses.end_ts):
+        response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return')
         assert response.status_code == status.HTTP_200_OK
 
 
