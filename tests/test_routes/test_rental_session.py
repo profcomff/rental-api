@@ -1,17 +1,18 @@
 import datetime
 from contextlib import contextmanager
-from typing import Any, Dict, Generator, List
+from typing import Generator
 
 import pytest
 from sqlalchemy import desc
 from starlette import status
 
-from rental_backend.exceptions import AlreadyExists
 from rental_backend.models.base import BaseDbModel
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
 from tests.conftest import make_url_query, model_to_dict
+
+
 # TODO: вынести явно не использующие фикстуры в тестах в mark.usefixtures.
 obj_prefix: str = rental_session.prefix
 
@@ -44,15 +45,25 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
 # Tests for POST /rental-sessions/{item_type_id}
 @pytest.mark.usefixtures('expire_mock')
 @pytest.mark.parametrize(
-        'start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations',
-        [
-            (True, False, 0, status.HTTP_200_OK, 1),
-            (False, False, 0, status.HTTP_404_NOT_FOUND, 0),
-            (True, True, 1, status.HTTP_404_NOT_FOUND, 0)
-        ],
-        ids=['avail_item', 'not_avail_item', 'unexisting_itemtype']
+    'start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations',
+    [
+        (True, False, 0, status.HTTP_200_OK, 1),
+        (False, False, 0, status.HTTP_404_NOT_FOUND, 0),
+        (True, True, 1, status.HTTP_404_NOT_FOUND, 0),
+    ],
+    ids=['avail_item', 'not_avail_item', 'unexisting_itemtype'],
 )
-def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url, start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations):
+def test_create_with_diff_item(
+    dbsession,
+    client,
+    item_fixture,
+    base_rentses_url,
+    start_item_avail,
+    end_item_avail,
+    itemtype_list_ind,
+    right_status_code,
+    num_of_creations,
+):
     """Проверка старта аренды разных Item от разных ItemType."""
     item_fixture.is_available = start_item_avail
     dbsession.add(item_fixture)
@@ -61,7 +72,10 @@ def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url
         type_id = ItemType.query(session=dbsession).all()[itemtype_list_ind].id
     except IndexError:
         type_id = ItemType.query(session=dbsession).order_by(desc('id'))[0].id + 1
-    with check_object_creation(RentalSession, dbsession, num_of_creations=num_of_creations), check_object_update(item_fixture, session=dbsession, is_available=end_item_avail):
+    with (
+        check_object_creation(RentalSession, dbsession, num_of_creations=num_of_creations),
+        check_object_update(item_fixture, session=dbsession, is_available=end_item_avail),
+    ):
         response = client.post(f'{base_rentses_url}/{type_id}')
         assert response.status_code == right_status_code
 
@@ -78,9 +92,7 @@ def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url
     ],
     ids=['text', 'hyphen', 'subpath', 'negative_num', 'empty'],
 )
-def test_create_with_invalid_id(
-    dbsession, client, base_rentses_url, invalid_itemtype_id, right_status_code
-):
+def test_create_with_invalid_id(dbsession, client, base_rentses_url, invalid_itemtype_id, right_status_code):
     """Проверка логики метода с невалидным item_type_id."""
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
         response = client.post(f'{base_rentses_url}/{invalid_itemtype_id}')
@@ -100,6 +112,7 @@ def test_create_internal_server_error(mocker, dbsession, client, item_fixture, b
     response = client.post(f"{base_rentses_url}/{item_fixture.type_id}")
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1
+
 
 @pytest.mark.usefixtures('expiration_time_mock')
 def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
@@ -450,9 +463,7 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     ],
     ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
-def test_update_invalid_id(
-    client, base_rentses_url, session_id, right_status_code
-):
+def test_update_invalid_id(client, base_rentses_url, session_id, right_status_code):
     """Проверка обновления сессии по невалидному URL-path."""
     valid_update_payload = {
         "status": "reserved",

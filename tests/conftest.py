@@ -64,16 +64,15 @@ def another_user_mock(authlib_mock, another_authlib_user):
     authlib_mock.return_value = another_authlib_user
     return authlib_mock
 
-@pytest.mark.usefixtures('user_mock')
+
 @pytest.fixture
-def client():
+def client(user_mock):
     client = TestClient(app, raise_server_exceptions=False)
     return client
 
 
-@pytest.mark.usefixtures('another_user_mock')
 @pytest.fixture
-def another_client():
+def another_client(another_user_mock):
     client = TestClient(app, raise_server_exceptions=False)
     return client
 
@@ -86,7 +85,7 @@ def base_test_url(client):
 @pytest.fixture
 def base_rentses_url(request, base_test_url: str) -> str:
     """Формирует корневой URL для объекта.
-    
+
     URL определяется по переменной obj_prefix в файле теста,
     в котором вызывается данная фикстура.
     """
