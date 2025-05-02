@@ -68,34 +68,6 @@ def base_rentses_url(base_test_url: str) -> str:
     return f'{base_test_url}{rental_session.prefix}'
 
 
-# @pytest.fixture
-# def available_item(dbsession, item_fixture) -> Item:
-#     """Item, доступный для аренды.
-
-#     .. note::
-#         Очистка производится в dbsession.
-#     """
-#     if item_fixture.is_available == False:
-#         Item.update(item_fixture.id, session=dbsession, is_available=True)
-#         dbsession.refresh(item_fixture)
-#         dbsession.commit()
-#     return item_fixture
-
-
-@pytest.fixture
-def nonavailable_item(dbsession, item_fixture) -> Item:
-    """Item, не доступный для аренды.
-
-    .. note::
-        Очистка производится в dbsession.
-    """
-    if item_fixture.is_available == True:
-        Item.update(item_fixture.id, session=dbsession, is_available=False)
-        dbsession.refresh(item_fixture)
-        dbsession.commit()
-    return item_fixture
-
-
 @pytest.fixture
 def valid_update_payload() -> Dict[str, Any]:
     """Валидный словарь параметров для обновления RentalSession."""
@@ -206,13 +178,16 @@ def test_create_with_avail_item(dbsession, client, item_fixture, base_rentses_ur
     ), 'Убедитесь, что Item становится недоступен для аренды после создания RentalSession с ним!'
 
 
-def test_create_with_no_avail_item(dbsession, client, nonavailable_item, base_rentses_url, expire_mock):
+def test_create_with_no_avail_item(dbsession, client, item_fixture, base_rentses_url, expire_mock):
     """Проверка логики метода без исходно доступных предметов."""
+    item_fixture.is_available = False
+    dbsession.add(item_fixture)
+    dbsession.commit()
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
-        response = client.post(f'{base_rentses_url}/{nonavailable_item.type_id}')
+        response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
         assert response.status_code == status.HTTP_404_NOT_FOUND
-    dbsession.refresh(nonavailable_item)
-    assert nonavailable_item.is_available == False, 'Убедитесь, что Item остается недоступен для аренды!'
+    dbsession.refresh(item_fixture)
+    assert item_fixture.is_available == False, 'Убедитесь, что Item остается недоступен для аренды!'
 
 
 def test_create_with_unexisting_id(dbsession, client, base_rentses_url, expire_mock):
