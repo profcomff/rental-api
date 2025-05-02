@@ -79,7 +79,6 @@ def rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
         session=dbsession,
         user_id=authlib_user.get("id"),
         item_id=item_fixture.id,
-        reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
     )
     item_fixture.is_available = False
@@ -96,7 +95,6 @@ def another_rentses(dbsession, items_with_same_type, another_authlib_user) -> Re
         session=dbsession,
         user_id=another_authlib_user.get("id"),
         item_id=renting_item.id,
-        reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
     )
     Item.update(id=renting_item.id, session=dbsession, is_available=False)
