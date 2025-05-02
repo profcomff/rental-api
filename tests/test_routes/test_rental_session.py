@@ -12,6 +12,7 @@ from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
 from tests.conftest import make_url_query, model_to_dict
+# TODO: вынести явно не использующие фикстуры в тестах в mark.usefixtures.
 
 
 # New fixtures
@@ -214,11 +215,27 @@ def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture, ex
 
 
 # Tests for PATCH /rental-sessions/{session_id}/start
-def test_start_success(dbsession, client, rentses, base_rentses_url):
-    """Проверка логики метода с успешным стартом аренды."""
-    with check_object_update(rentses, dbsession, status=RentStatus.ACTIVE):
-        response = client.patch(f'{base_rentses_url}/{rentses.id}/start')
-        assert response.status_code == status.HTTP_200_OK
+@pytest.mark.parametrize(
+    'session_list_ind, right_status_code, update_status',
+    [
+        (0, status.HTTP_200_OK, True),
+        (1, status.HTTP_404_NOT_FOUND, False)
+    ],
+    ids=['success', 'unexisting_id'],
+)
+def test_start_with_diff_id(dbsession, client, rentses, base_rentses_url, session_list_ind, right_status_code, update_status):
+    """Проверка старта подходящей и несуществующей сессии."""
+    try:
+        session_id = RentalSession.query(session=dbsession).all()[session_list_ind].id
+    except IndexError:
+        session_id = RentalSession.query(session=dbsession).order_by(desc('id'))[0].id + 1
+    if update_status:
+        new_status = RentStatus.ACTIVE
+    else:
+        new_status = rentses.status
+    with check_object_update(rentses, dbsession, status=new_status):
+        response = client.patch(f'{base_rentses_url}/{session_id}/start')
+        assert response.status_code == right_status_code
 
 
 @pytest.mark.parametrize(
@@ -241,26 +258,28 @@ def test_start_with_invalid_id(dbsession, client, base_rentses_url, rentses, ses
         assert response.status_code == right_status_code
 
 
-def test_start_with_unexisting_session(dbsession, client, base_rentses_url, rentses):
-    """Проверка попытки старта несуществующей сессии аренды."""
-    try:
-        unexisting_id = RentalSession.query(session=dbsession).order_by(desc('id'))[0].id + 1
-    except IndexError:
-        unexisting_id = 1
-    response = client.patch(f'{base_rentses_url}/{unexisting_id}/start')
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-
-
 # Tests for PATCH /rental-sessions/{session_id}/return
-def test_return_success(dbsession, client, active_rentses, base_rentses_url):
-    """Проверка логики метода с успешным окончанием аренды."""
-    avail_item = Item.get(id=active_rentses.item_id, session=dbsession)
-    with (
-        check_object_update(active_rentses, dbsession, status=RentStatus.RETURNED),
-        check_object_update(avail_item, dbsession, is_available=False),
-    ):
-        response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return')
-        assert response.status_code == status.HTTP_200_OK
+@pytest.mark.parametrize(
+    'session_list_ind, right_status_code, update_status',
+    [
+        (0, status.HTTP_200_OK, True),
+        (1, status.HTTP_404_NOT_FOUND, False)
+    ],
+    ids=['success', 'unexisting_id'],
+)
+def test_return_with_diff_id(dbsession, client, active_rentses, base_rentses_url, session_list_ind, right_status_code, update_status):
+    """Проверка окончания подходящей и несуществующей сессии."""
+    try:
+        session_id = RentalSession.query(session=dbsession).all()[session_list_ind].id
+    except IndexError:
+        session_id = RentalSession.query(session=dbsession).order_by(desc('id'))[0].id + 1
+    if update_status:
+        new_status = RentStatus.RETURNED
+    else:
+        new_status = active_rentses.status
+    with check_object_update(active_rentses, dbsession, status=new_status):
+        response = client.patch(f'{base_rentses_url}/{session_id}/return')
+        assert response.status_code == right_status_code
 
 
 @pytest.mark.parametrize(
@@ -281,16 +300,6 @@ def test_return_with_invalid_id(dbsession, client, base_rentses_url, rentses, se
         if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
             pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
         assert response.status_code == right_status_code
-
-
-def test_return_with_unexisting_session(dbsession, client, base_rentses_url, rentses):
-    """Проверка попытки старта несуществующей сессии аренды."""
-    try:
-        unexisting_id = RentalSession.query(session=dbsession).order_by(desc('id'))[0].id + 1
-    except IndexError:
-        unexisting_id = 1
-    response = client.patch(f'{base_rentses_url}/{unexisting_id}/return')
-    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_return_inactive(dbsession, client, rentses, base_rentses_url):
