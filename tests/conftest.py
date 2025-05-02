@@ -64,15 +64,16 @@ def another_user_mock(authlib_mock, another_authlib_user):
     authlib_mock.return_value = another_authlib_user
     return authlib_mock
 
-
+@pytest.mark.usefixtures('user_mock')
 @pytest.fixture
-def client(user_mock):
+def client():
     client = TestClient(app, raise_server_exceptions=False)
     return client
 
 
+@pytest.mark.usefixtures('another_user_mock')
 @pytest.fixture
-def another_client(another_user_mock):
+def another_client():
     client = TestClient(app, raise_server_exceptions=False)
     return client
 

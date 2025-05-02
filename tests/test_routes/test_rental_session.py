@@ -42,6 +42,7 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
 
 
 # Tests for POST /rental-sessions/{item_type_id}
+@pytest.mark.usefixtures('expire_mock')
 @pytest.mark.parametrize(
         'start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations',
         [
@@ -51,7 +52,7 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
         ],
         ids=['avail_item', 'not_avail_item', 'unexisting_itemtype']
 )
-def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url, expire_mock, start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations):
+def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url, start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations):
     """Проверка старта аренды разных Item от разных ItemType."""
     item_fixture.is_available = start_item_avail
     dbsession.add(item_fixture)
@@ -65,6 +66,7 @@ def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url
         assert response.status_code == right_status_code
 
 
+@pytest.mark.usefixtures('expire_mock')
 @pytest.mark.parametrize(
     'invalid_itemtype_id, right_status_code',
     [
@@ -77,7 +79,7 @@ def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url
     ids=['text', 'hyphen', 'subpath', 'negative_num', 'empty'],
 )
 def test_create_with_invalid_id(
-    dbsession, client, base_rentses_url, expire_mock, invalid_itemtype_id, right_status_code
+    dbsession, client, base_rentses_url, invalid_itemtype_id, right_status_code
 ):
     """Проверка логики метода с невалидным item_type_id."""
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
@@ -99,8 +101,8 @@ def test_create_internal_server_error(mocker, dbsession, client, item_fixture, b
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert error_func.call_count == 1
 
-
-def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture, expiration_time_mock):
+@pytest.mark.usefixtures('expiration_time_mock')
+def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
     """Проверка правильного срабатывания check_session_expiration."""
     item_fixture.is_available = True
     dbsession.add(item_fixture)
@@ -223,6 +225,7 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
 
 
 # Tests for GET /rental-sessions/user/{user_id}
+@pytest.mark.usefixtures('rentses')
 @pytest.mark.parametrize(
     'user_id, right_status_code',
     [
@@ -235,7 +238,7 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
     ],
     ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'empty'],
 )
-def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, rentses, user_id, right_status_code):
+def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, user_id, right_status_code):
     """Проверка логики метода с разным user_id."""
     response = client.get(f'{base_rentses_url}/user/{user_id}')
     if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
@@ -260,6 +263,7 @@ def test_get_for_user_internal_server_error(mocker, client, base_rentses_url, re
 
 
 # Tests for GET /rental-sessions/{session_id}
+@pytest.mark.usefixtures('rentses')
 @pytest.mark.xfail(reason='Ждет issue #40. Потом удалить маркер и проверить тесты.')
 @pytest.mark.parametrize(
     'session_id, right_status_code',
@@ -274,7 +278,7 @@ def test_get_for_user_internal_server_error(mocker, client, base_rentses_url, re
     ],
     ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'empty', 'excess_query'],
 )
-def test_retrieve_diff_id(dbsession, client, base_rentses_url, rentses, session_id, right_status_code):
+def test_retrieve_diff_id(dbsession, client, base_rentses_url, session_id, right_status_code):
     """Проверка получения сессии по разным URL-path."""
     try:
         id = RentalSession.query(session=dbsession).all()[session_id].id
@@ -433,6 +437,7 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     assert is_really_updated == update_in_db
 
 
+@pytest.mark.usefixtures('dbsession', 'rentses')
 @pytest.mark.parametrize(
     'session_id, right_status_code',
     [
@@ -446,7 +451,7 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
 def test_update_invalid_id(
-    dbsession, client, base_rentses_url, rentses, session_id, right_status_code
+    client, base_rentses_url, session_id, right_status_code
 ):
     """Проверка обновления сессии по невалидному URL-path."""
     valid_update_payload = {
@@ -476,6 +481,7 @@ def test_update_internal_server_error(mocker, client, base_rentses_url, rentses)
 
 
 # Tests for GET /rental-sessions
+@pytest.mark.usefixtures('dbsession', 'rentses')
 @pytest.mark.parametrize(
     'is_reserved, is_canceled, is_dismissed, is_overdue, is_returned, is_active, right_status_code',
     [
@@ -514,10 +520,8 @@ def test_update_internal_server_error(mocker, client, base_rentses_url, rentses)
     ],
 )
 def test_get_url_query(
-    dbsession,
     client,
     base_rentses_url,
-    rentses,
     is_reserved,
     is_canceled,
     is_dismissed,
@@ -612,7 +616,8 @@ def test_cancel_wrong_status(dbsession, client, base_rentses_url, rentses, new_w
         ), 'Убедитесь, что нельзя отменить незарезервированную сессию!'
 
 
-def test_cancel_internal_server_error(mocker, dbsession, client, base_rentses_url, rentses):
+@pytest.mark.usefixtures('dbsession')
+def test_cancel_internal_server_error(mocker, client, base_rentses_url, rentses):
     """Проверяет случай возникновения неожиданной ошибки."""
     error_func = mocker.patch(
         "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
