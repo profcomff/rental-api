@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import pytest
 from fastapi.testclient import TestClient
@@ -82,6 +82,19 @@ def base_test_url(client):
     return client.base_url
 
 
+@pytest.fixture
+def base_rentses_url(request, base_test_url: str) -> str:
+    """Формирует корневой URL для объекта.
+    
+    URL определяется по переменной obj_prefix в файле теста,
+    в котором вызывается данная фикстура.
+    """
+    prefix = getattr(request.module, 'obj_prefix', None)
+    if prefix is None:
+        raise AttributeError('Для работы данной фикстуры требуется определить obj_prefix в файле, содержащем тест!')
+    return f'{base_test_url}{prefix}'
+
+
 @pytest.fixture()
 def dbsession():
     """Фикстура настройки Session для работы с БД в тестах.
@@ -117,6 +130,16 @@ def item_type_fixture(dbsession):
     dbsession.add(item_type)
     dbsession.commit()
     return item_type
+
+
+@pytest.fixture
+def item_types(dbsession) -> List[ItemType]:
+    """Создает 2 itemType в БД и возвращает их."""
+    itemtypes = []
+    for ind in range(2):
+        itemtypes.append(ItemType.create(session=dbsession, name=f'Test ItemType {ind}'))
+    dbsession.commit()
+    return itemtypes
 
 
 @pytest.fixture(scope="function")
@@ -155,6 +178,83 @@ def items_with_types(dbsession):
     for item_type in item_types:
         dbsession.delete(item_type)
     dbsession.commit()
+
+
+@pytest.fixture
+def items_with_same_type(dbsession, item_types) -> List[Item]:
+    """Создает 2 Item с одним itemType в БД и возвращает их."""
+    items = []
+    for _ in range(2):
+        items.append(Item.create(session=dbsession, type_id=item_types[0].id))
+    dbsession.commit()
+    return items
+
+
+@pytest.fixture()
+def expire_mock(mocker):
+    """Mock-объект для функции check_session_expiration."""
+    fake_check = mocker.patch('rental_backend.routes.rental_session.check_session_expiration')
+    fake_check.return_value = True
+    return fake_check
+
+
+@pytest.fixture
+def expiration_time_mock(mocker):
+    """Мок для RENTAL_SESSION_EXPIRY, чтобы не ждать в ходе тестов."""
+    fast_expiration = mocker.patch(
+        'rental_backend.routes.rental_session.RENTAL_SESSION_EXPIRY', new=datetime.timedelta(seconds=2)
+    )
+    return fast_expiration
+
+
+@pytest.fixture
+def rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
+    """Экземпляр RentalSession, создаваемый в POST /rental_session.
+
+    .. note::
+        Очистка происходит в dbsession.
+    """
+    rent = RentalSession.create(
+        session=dbsession,
+        user_id=authlib_user.get("id"),
+        item_id=item_fixture.id,
+        status=RentStatus.RESERVED,
+    )
+    item_fixture.is_available = False
+    dbsession.add(rent, item_fixture)
+    dbsession.commit()
+    return rent
+
+
+@pytest.fixture
+def another_rentses(dbsession, items_with_same_type, another_authlib_user) -> RentalSession:
+    """Еще один экземпляр RentalSession с отличающимся пользователем."""
+    renting_item = items_with_same_type[0]
+    rent = RentalSession.create(
+        session=dbsession,
+        user_id=another_authlib_user.get("id"),
+        item_id=renting_item.id,
+        status=RentStatus.RESERVED,
+    )
+    Item.update(id=renting_item.id, session=dbsession, is_available=False)
+    dbsession.add(rent)
+    dbsession.commit()
+    return rent
+
+
+@pytest.fixture
+def active_rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
+    """Начатая сессия аренды."""
+    rent = RentalSession.create(
+        session=dbsession,
+        user_id=authlib_user.get("id"),
+        item_id=item_fixture.id,
+        status=RentStatus.ACTIVE,
+    )
+    item_fixture.is_available = False
+    dbsession.add(rent, item_fixture)
+    dbsession.commit()
+    return rent
 
 
 # Utils

@@ -13,110 +13,7 @@ from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
 from tests.conftest import make_url_query, model_to_dict
 # TODO: вынести явно не использующие фикстуры в тестах в mark.usefixtures.
-
-
-# New fixtures
-@pytest.fixture()
-def expire_mock(mocker):
-    """Mock-объект для функции check_session_expiration."""
-    fake_check = mocker.patch('rental_backend.routes.rental_session.check_session_expiration')
-    fake_check.return_value = True
-    return fake_check
-
-
-@pytest.fixture
-def expiration_time_mock(mocker):
-    """Мок для RENTAL_SESSION_EXPIRY, чтобы не ждать в ходе тестов."""
-    fast_expiration = mocker.patch(
-        'rental_backend.routes.rental_session.RENTAL_SESSION_EXPIRY', new=datetime.timedelta(seconds=2)
-    )
-    return fast_expiration
-
-
-@pytest.fixture
-def item_types(dbsession) -> List[ItemType]:
-    """Создает 2 itemType в БД и возвращает их."""
-    itemtypes = []
-    for ind in range(2):
-        itemtypes.append(ItemType.create(session=dbsession, name=f'Test ItemType {ind}'))
-    dbsession.commit()
-    return itemtypes
-
-
-@pytest.fixture
-def items_with_same_type(dbsession, item_types) -> List[Item]:
-    """Создает 2 Item с одним itemType в БД и возвращает их."""
-    items = []
-    for _ in range(2):
-        items.append(Item.create(session=dbsession, type_id=item_types[0].id))
-    dbsession.commit()
-    return items
-
-
-@pytest.fixture
-def items_with_diff_types(dbsession, item_types) -> List[Item]:
-    """Создает 2 Item с разными itemType в БД и возвращает их."""
-    items = []
-    for ind in range(2):
-        items.append(Item.create(session=dbsession, type_id=item_types[ind].id))
-    dbsession.commit()
-    return items
-
-
-@pytest.fixture
-def base_rentses_url(base_test_url: str) -> str:
-    """Формирует корневой URL для Item."""
-    return f'{base_test_url}{rental_session.prefix}'
-
-
-@pytest.fixture
-def rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
-    """Экземпляр RentalSession, создаваемый в POST /rental_session.
-
-    .. note::
-        Очистка происходит в dbsession.
-    """
-    rent = RentalSession.create(
-        session=dbsession,
-        user_id=authlib_user.get("id"),
-        item_id=item_fixture.id,
-        status=RentStatus.RESERVED,
-    )
-    item_fixture.is_available = False
-    dbsession.add(rent, item_fixture)
-    dbsession.commit()
-    return rent
-
-
-@pytest.fixture
-def another_rentses(dbsession, items_with_same_type, another_authlib_user) -> RentalSession:
-    """Еще один экземпляр RentalSession с отличающимся пользователем."""
-    renting_item = items_with_same_type[0]
-    rent = RentalSession.create(
-        session=dbsession,
-        user_id=another_authlib_user.get("id"),
-        item_id=renting_item.id,
-        status=RentStatus.RESERVED,
-    )
-    Item.update(id=renting_item.id, session=dbsession, is_available=False)
-    dbsession.add(rent)
-    dbsession.commit()
-    return rent
-
-
-@pytest.fixture
-def active_rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
-    """Начатая сессия аренды."""
-    rent = RentalSession.create(
-        session=dbsession,
-        user_id=authlib_user.get("id"),
-        item_id=item_fixture.id,
-        status=RentStatus.ACTIVE,
-    )
-    item_fixture.is_available = False
-    dbsession.add(rent, item_fixture)
-    dbsession.commit()
-    return rent
+obj_prefix: str = rental_session.prefix
 
 
 # Subtests (not call directly by pytest)
@@ -137,11 +34,11 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
     yield
     session.refresh(model_instance)
     for field in final_fields:
-        old_field = final_fields[field]
-        new_field = getattr(model_instance, field)
+        expecting_field = final_fields[field]
+        current_field = getattr(model_instance, field)
         assert (
-            old_field == new_field
-        ), f'Убедитесь, поле {field} модели {model_instance.__class__.__name__} в БД меняется (или нет) корректно!\nБыло -- {old_field}\nСтало -- {new_field}.'
+            expecting_field == current_field
+        ), f'Убедитесь, поле {field} модели {model_instance.__class__.__name__} в БД меняется (или нет) корректно!\nБыло -- {expecting_field}\nСтало -- {current_field}.'
 
 
 # Tests for POST /rental-sessions/{item_type_id}
@@ -155,6 +52,7 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
         ids=['avail_item', 'not_avail_item', 'unexisting_itemtype']
 )
 def test_create_with_diff_item(dbsession, client, item_fixture, base_rentses_url, expire_mock, start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations):
+    """Проверка старта аренды разных Item от разных ItemType."""
     item_fixture.is_available = start_item_avail
     dbsession.add(item_fixture)
     dbsession.commit()
@@ -228,6 +126,7 @@ def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture, ex
     ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'empty'],
 )
 def test_start_with_diff_id(dbsession, client, rentses, base_rentses_url, session_id, right_status_code):
+    """Проверка попытки старта аренды по разным session_id."""
     try:
         id = RentalSession.query(session=dbsession).all()[session_id].id
         new_status = RentStatus.ACTIVE
@@ -337,7 +236,7 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
     ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'empty'],
 )
 def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, rentses, user_id, right_status_code):
-    """Проверка логики метода с невалидным user_id."""
+    """Проверка логики метода с разным user_id."""
     response = client.get(f'{base_rentses_url}/user/{user_id}')
     if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
         pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
