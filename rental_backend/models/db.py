@@ -27,7 +27,7 @@ class RentStatus(str, Enum):
 
 class Item(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"))
+    type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"), nullable=False)
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
     type: Mapped["ItemType"] = relationship("ItemType", back_populates="items")
 

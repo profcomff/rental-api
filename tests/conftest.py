@@ -56,10 +56,16 @@ def item_type_fixture(dbsession):
     .. note::
         Очистка производится в dbsession.
     """
-    item_type = ItemType(id=0, name='Test ItemType')
+    item_type = ItemType(id=228322, name='Test ItemType')
     dbsession.add(item_type)
     dbsession.commit()
-    return item_type
+    yield item_type
+    if item_type.items:
+        for item in item_type.items:
+            dbsession.delete(item)
+        dbsession.flush()
+    dbsession.delete(item_type)
+    dbsession.commit()
 
 
 @pytest.fixture(scope="function")
