@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings"""
 
-    DB_DSN: PostgresDsn = "postgresql://postgres@localhost:5432/postgres"
+    DB_DSN: PostgresDsn = "postgresql://postgres@localhost:5434/postgres"
     ROOT_PATH: str = "/" + os.getenv("APP_NAME", "")
 
     CORS_ALLOW_ORIGINS: list[str] = ["*"]
