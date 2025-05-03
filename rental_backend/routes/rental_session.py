@@ -7,7 +7,7 @@ from fastapi_sqlalchemy import db
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
-from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikeGet, StrikePost
+from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
 from rental_backend.utils.action import ActionLogger
 
 
@@ -282,13 +282,16 @@ async def update_rental_session(
     upd_data = update_data.model_dump(exclude_unset=True)
 
     updated_session = RentalSession.update(session=db.session, id=session_id, **upd_data)
-
     ActionLogger.log_event(
         user_id=session.user_id,
         admin_id=user.get("id"),
         session_id=session.id,
         action_type="UPDATE_SESSION",
-        details={"status": session.status, "end_ts": session.end_ts, "actual_return_ts": session.actual_return_ts},
+        details={
+            "status": updated_session.status,
+            "end_ts": updated_session.end_ts.isoformat(timespec="milliseconds"),
+            "actual_return_ts": updated_session.actual_return_ts.isoformat(timespec="milliseconds"),
+        },
     )
 
     return RentalSessionGet.model_validate(updated_session)
