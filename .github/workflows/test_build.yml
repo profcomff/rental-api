@@ -10,7 +10,7 @@ on:
       expire_hours:
         description: 'Number of hours until the test build expires'
         required: true
-        default: '24'
+        default: 24
         type: number
 
 env:
