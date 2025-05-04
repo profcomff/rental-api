@@ -104,12 +104,3 @@ def items_with_types(dbsession):
     for item_type in item_types:
         dbsession.delete(item_type)
     dbsession.commit()
-
-
-# Utils
-def model_to_dict(model: BaseDbModel) -> Dict[str, Any]:
-    """Возвращает поля модели БД в виде словаря."""
-    model_dict = dict()
-    for col in model.__table__.columns:
-        model_dict[col.name] = getattr(model, col.name)
-    return model_dict
