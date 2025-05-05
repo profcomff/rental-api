@@ -35,6 +35,6 @@ def test_get_item_id(client, dbsession, items_with_types, item_n, response_statu
     item_id = -1
     if item.is_available:
         item_id = item.id
-    response = client.get(f'{url}', params={"id": item_id})
+    response = client.get(f'{url}/{item_id}')
     print(response.content)
     assert response.status_code == response_status
