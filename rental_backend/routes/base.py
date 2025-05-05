@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
-from logger_middleware import LoggerMiddleware
 
 from rental_backend import __version__
 from rental_backend.routes.event import event
@@ -38,7 +37,6 @@ app.add_middleware(
     allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
-app.add_middleware(LoggerMiddleware, service_id=settings.SERVICE_ID)
 
 app.include_router(event)
 app.include_router(item)
