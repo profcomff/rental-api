@@ -70,11 +70,6 @@ def item_type_fixture(dbsession):
 
 @pytest.fixture(scope="function")
 def item_fixture(dbsession, item_type_fixture):
-    """Фикстура Item.
-
-    .. note::
-        Очистка производится в dbsession.
-    """
     item = Item(type_id=item_type_fixture.id)
     dbsession.add(item)
     dbsession.commit()
@@ -84,23 +79,26 @@ def item_fixture(dbsession, item_type_fixture):
 @pytest.fixture(scope="function")
 def items_with_types(dbsession):
     item_types = [
-        ItemType(name="Type1"),
-        ItemType(name="Type2"),
+        ItemType(id=123451, name="Type1"),
+        ItemType(id=123444, name="Type2"),
+        ItemType(id=990876, name="Type3"),
     ]
-    dbsession.add_all(item_types)
+    for item_type in item_types:
+        dbsession.add(item_type)
     dbsession.commit()
 
     items = [
-        Item(type_id=item_types[0].id),
-        Item(type_id=item_types[1].id),
+        Item(type_id=item_types[0].id, is_available=True),
+        Item(type_id=item_types[1].id, is_available=True),
+        Item(type_id=item_types[2].id, is_available=False),
     ]
-    dbsession.add_all(items)
+    for i in items:
+        dbsession.add(i)
     dbsession.commit()
-
-    yield items, item_types
-
-    for item in items:
-        dbsession.delete(item)
-    for item_type in item_types:
-        dbsession.delete(item_type)
+    yield items
+    for i in item_types:
+        for item in i.items:
+            dbsession.delete(item)
+        dbsession.flush()
+        dbsession.delete(i)
     dbsession.commit()
