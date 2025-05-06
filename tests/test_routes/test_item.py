@@ -25,17 +25,29 @@ def test_create_item(client, item_type_fixture, response_status):
 
 
 @pytest.mark.parametrize(
-    'item_n, response_status',
+    'item_n,response_status',
     [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_404_NOT_FOUND)],
 )
 def test_get_item_id(client, dbsession, items_with_types, item_n, response_status):
     items = items_with_types
     item = dbsession.query(Item).filter(Item.id == items[item_n].id).one_or_none()
-    print(item)
     # check non-existing id request
     item_id = -1
     if item.is_available:
         item_id = item.id
     response = client.get(f'{url}/{item_id}')
-    print(response.content)
     assert response.status_code == response_status
+
+
+@pytest.mark.parametrize(
+    'params,response_status',
+    [
+        ({"type_id": 0}, status.HTTP_200_OK),
+    ],
+)
+def test_get_items_by_type_id(client, params, response_status):
+    response = client.get(f'{url}', params=params)
+    assert response.status_code == response_status
+    if response_status == status.HTTP_200_OK:
+        json_response = response.json()
+        assert json_response!=""
