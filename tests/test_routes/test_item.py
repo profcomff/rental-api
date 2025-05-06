@@ -50,4 +50,4 @@ def test_get_items_by_type_id(client, params, response_status):
     assert response.status_code == response_status
     if response_status == status.HTTP_200_OK:
         json_response = response.json()
-        assert json_response!=""
+        assert json_response != ""
