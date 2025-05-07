@@ -51,3 +51,23 @@ def test_get_items_by_type_id(client, params, response_status):
     if response_status == status.HTTP_200_OK:
         json_response = response.json()
         assert json_response != ""
+
+
+@pytest.mark.parametrize(
+    'item_id,body,response_status',
+    [
+        # conflict with available true as it is true before update
+        (1, {"is_available": True}, status.HTTP_409_CONFLICT),
+        (1, {"is_available": False}, status.HTTP_200_OK),
+        # Non-existent id
+        (-1, {"is_available": False}, status.HTTP_404_NOT_FOUND),
+    ],
+)
+def test_update_comment(client, dbsession, items_with_types, item_id, body, response_status):
+    response = client.patch(f"{url}/{item_id}", params=body)
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        json_responce = response.json()
+        assert json_responce["id"] == item_id
+        assert json_responce["type_id"] == items_with_types[item_id - 1].type_id
+        assert json_responce["is_available"] == body["is_available"]

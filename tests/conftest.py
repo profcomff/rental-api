@@ -101,9 +101,9 @@ def items_with_types(dbsession):
     dbsession.commit()
 
     items = [
-        Item(type_id=item_types[0].id, is_available=True),
-        Item(type_id=item_types[1].id, is_available=True),
-        Item(type_id=item_types[2].id, is_available=False),
+        Item(id=1, type_id=item_types[0].id, is_available=True),
+        Item(id=2, type_id=item_types[1].id, is_available=True),
+        Item(id=3, type_id=item_types[2].id, is_available=False),
     ]
     for i in items:
         dbsession.add(i)
