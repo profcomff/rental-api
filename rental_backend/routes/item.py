@@ -12,7 +12,7 @@ from rental_backend.utils.action import ActionLogger
 
 
 settings: Settings = get_settings()
-item = APIRouter(prefix="/items", tags=["Items"])
+item = APIRouter(prefix="/item", tags=["Items"])
 
 
 @item.get("", response_model=list[ItemGet])
@@ -81,7 +81,7 @@ async def update_item(
     raise ObjectNotFound(Item, id)
 
 
-@item.delete("/item/{id}", response_model=StatusResponseModel)
+@item.delete("/{id}", response_model=StatusResponseModel)
 async def delete_item(
     id: int, user=Depends(UnionAuth(scopes=["rental.item.delete"], allow_none=False))
 ) -> StatusResponseModel:
@@ -104,3 +104,12 @@ async def delete_item(
         details={"id": id},
     )
     return StatusResponseModel(status="success", message="Item успешно удален", ru="Предмет успешно удален")
+
+
+@item.get("/{id}", response_model=ItemGet)
+async def get_item(id: int) -> ItemGet:
+    """
+    Получает предмет по его идентификатору.
+    """
+    item = Item.get(id=id, session=db.session)
+    return ItemGet.model_validate(item)
