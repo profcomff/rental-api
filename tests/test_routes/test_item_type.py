@@ -1,10 +1,10 @@
 import pytest
-from conftest import model_to_dict
 from sqlalchemy import desc
 from starlette import status
 
 from rental_backend.models.db import ItemType
 from rental_backend.routes.item_type import item_type
+from tests.conftest import model_to_dict
 
 
 # New fixtures for itemtype tests
