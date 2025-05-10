@@ -1,7 +1,6 @@
 import datetime
 from typing import Optional
 
-from pydantic import BaseModel
 
 from rental_backend.models.db import RentStatus
 from rental_backend.schemas.base import Base
@@ -32,7 +31,7 @@ class ItemPost(Base):
     is_available: bool = False
 
 
-class EventGet(BaseModel):
+class EventGet(Base):
     id: int
     user_id: int | None = None
     admin_id: int | None = None
@@ -43,7 +42,7 @@ class EventGet(BaseModel):
 
 
 # Модель для создания страйка
-class StrikePost(BaseModel):
+class StrikePost(Base):
     user_id: int
     admin_id: int
     reason: str
@@ -51,13 +50,13 @@ class StrikePost(BaseModel):
 
 
 # Модель для получения страйка
-class StrikeGet(BaseModel):
+class StrikeGet(Base):
     id: int
     user_id: int
     admin_id: int
     reason: str
     session_id: int | None = None
-    created_ts: datetime.datetime
+    create_ts: datetime.datetime
 
 
 class RentalSessionPost(Base):
@@ -78,7 +77,7 @@ class RentalSessionGet(Base):
     status: RentStatus
 
 
-class RentalSessionPatch(BaseModel):
+class RentalSessionPatch(Base):
     status: Optional[RentStatus] = None
     end_ts: Optional[datetime.datetime] = None
     actual_return_ts: Optional[datetime.datetime] = None
