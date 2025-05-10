@@ -181,16 +181,14 @@ async def get_user_sessions(user_id, user=Depends(UnionAuth())):
         .filter(RentalSession.user_id == user_id)
         .all()
     )
-    
+
     response = []
     for session, strike_id in results:
         session_data = RentalSessionGet.model_validate(session)
-        session_data.strike_id = strike_id  # Добавляем strike_id после валидации
+        session_data.strike_id = strike_id
         response.append(session_data)
-    
+
     return response
-    # user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
-    # return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
 
 
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
@@ -202,20 +200,16 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
         .filter(RentalSession.id == session_id)
         .first()
     )
-    
+
     if not result:
         raise ObjectNotFound("Сессия не найдена")
-    
+
     session, strike_id = result
 
     session_data = RentalSessionGet.model_validate(session)
     session_data.strike_id = strike_id
-    
+
     return session_data
-
-    # session = RentalSession.get(id=session_id, session=db.session)
-
-    # return RentalSessionGet.model_validate(session)
 
 
 @rental_session.get("", response_model=list[RentalSessionGet])
@@ -260,22 +254,13 @@ async def get_rental_sessions(
         .all()
     )
 
-
     response = []
     for session, strike_id in results:
         session_data = RentalSessionGet.model_validate(session)
         session_data.strike_id = strike_id
         response.append(session_data)
-    
-    return response
-    # rent_sessions = RentalSession.query(session=db.session).filter(RentalSession.status.in_(to_show)).all()
-    
-    # for session, strike_id in sessions:
-    #     session_data = RentalSessionGet.model_validate(session)
-    #     session_data.strike_id = strike_id
-    #     result.append(session_data)
 
-    # return [RentalSessionGet.model_validate(rent_session) for rent_session in rent_sessions]
+    return response
 
 
 @rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
