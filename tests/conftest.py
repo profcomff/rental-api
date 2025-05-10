@@ -80,7 +80,6 @@ def item_type_fixture(dbsession):
     return item_types
 
 
-
 @pytest.fixture(scope="function")
 def item_fixture(dbsession, item_type_fixture):
     """Фикстура Item.
@@ -93,7 +92,8 @@ def item_fixture(dbsession, item_type_fixture):
     dbsession.commit()
     return item
 
-#this fixture creates: data description
+
+# this fixture creates: data description
 @pytest.fixture(scope="function")
 def items_with_types(dbsession):
     item_types = [
