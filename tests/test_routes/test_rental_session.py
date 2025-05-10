@@ -13,7 +13,6 @@ from rental_backend.schemas.models import RentStatus
 from tests.conftest import make_url_query, model_to_dict
 
 
-# TODO: вынести явно не использующие фикстуры в тестах в mark.usefixtures.
 obj_prefix: str = rental_session.prefix
 
 
@@ -122,6 +121,8 @@ def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
     dbsession.commit()
     response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
     assert response.status_code == status.HTTP_200_OK
+    # print(RentalSession.get(id=response.json()['id'], session=dbsession))
+    # assert None
     assert (
         RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.OVERDUE
     ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.OVERDUE!'
