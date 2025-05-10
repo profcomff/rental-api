@@ -221,10 +221,11 @@ def test_return_with_strike(
         query_dict['with_strike'] = with_strike
     if strike_reason is not None:
         query_dict['strike_reason'] = strike_reason
-    strike_query = make_url_query(query_dict)
+    # strike_query = make_url_query(query_dict)
     num_of_creations = 1 if strike_created else 0
     with check_object_creation(Strike, dbsession, num_of_creations):
-        response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return{strike_query}')
+        # response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return{strike_query}')
+        response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return', params=query_dict)
         assert response.status_code == right_status_code
 
 
@@ -543,21 +544,19 @@ def test_get_url_query(
     right_status_code,
 ):
     """Проверка получения сессий при разных URL-query."""
-    query_data = dict()
-    if is_reserved is not None:
-        query_data['is_reserved'] = is_reserved
-    if is_canceled is not None:
-        query_data['is_canceled'] = is_canceled
-    if is_dismissed is not None:
-        query_data['is_dismissed'] = is_dismissed
-    if is_overdue is not None:
-        query_data['is_overdue'] = is_overdue
-    if is_returned is not None:
-        query_data['is_returned'] = is_returned
-    if is_active is not None:
-        query_data['is_active'] = is_active
-    print(query_data)
-    response = client.get(f'{base_rentses_url}{make_url_query(query_data)}')
+    query_data = {
+    key: value for key, value in {
+        'is_reserved': is_reserved,
+        'is_canceled': is_canceled,
+        'is_dismissed': is_dismissed,
+        'is_overdue': is_overdue,
+        'is_returned': is_returned,
+        'is_active': is_active
+    }.items() if value is not None
+}
+    # print(query_data)
+    # response = client.get(f'{base_rentses_url}{make_url_query(query_data)}')
+    response = client.get(f'{base_rentses_url}', params=query_data)
     assert response.status_code == right_status_code
     if right_status_code == status.HTTP_200_OK:
         assert isinstance(response.json(), list)

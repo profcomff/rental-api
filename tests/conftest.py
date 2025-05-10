@@ -75,7 +75,7 @@ def db_container(db_dsn_test):
         "--name", PostgresConfig.container_name,
         PostgresConfig.image
     ], check=True)
-    time.sleep(2)  # костыльно ждем старта БД.
+    time.sleep(3)  # костыльно ждем старта БД.
     alembic_cfg = AlembicConfig(PostgresConfig.alembic_ini)
     command.upgrade(alembic_cfg, "head")
     yield PostgresConfig.get_url()
