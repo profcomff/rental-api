@@ -1,7 +1,6 @@
 import datetime
 from typing import Optional
 
-
 from rental_backend.models.db import RentStatus
 from rental_backend.schemas.base import Base
 
