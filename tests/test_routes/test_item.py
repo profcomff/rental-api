@@ -47,7 +47,7 @@ def test_get_item_id(client, dbsession, items_with_types, item_n, response_statu
     [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK)],
 )
 def test_get_items_by_type_id(client, items_with_types, item_n, response_status):
-    # check non-existing id request
+    # check non-existing id request 
     item_type = -1
     try:
         item_type = items_with_types[item_n].type_id
