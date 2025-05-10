@@ -1,29 +1,27 @@
-from typing import Any, Dict, List
-import subprocess
-import time
-import os
-from functools import lru_cache
 import importlib
+import subprocess
 import sys
+import time
+from functools import lru_cache
 from pathlib import Path
-# import pdb
+from typing import Any, Dict, List
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from alembic import command
+from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from alembic.config import Config as AlembicConfig
-from alembic import command
-from pydantic import PostgresDsn
 
 from rental_backend.models.db import *
 from rental_backend.routes import app
-from rental_backend.settings import get_settings, Settings
+from rental_backend.settings import Settings, get_settings
 
 
-class PostgresConfig():
+class PostgresConfig:
     """Дата-класс со значениями для контейнера с тестовой БД и alembic-миграции."""
+
     container_name: str = 'rental_test'
     username: str = 'postgres'
     host: str = 'localhost'
@@ -47,14 +45,14 @@ def session_mp():
 
 
 @pytest.fixture(scope='session')
-def db_dsn_test(session_mp):
+def get_settings_mock(session_mp):
     """Переопределение get_settings в rental_backend/settings.py и перезагрузка base.app."""
+
     @lru_cache
     def get_test_settings() -> Settings:
         settings = Settings()
         settings.DB_DSN = PostgresConfig.get_url()
         return settings
-
 
     get_settings.cache_clear()
     dsn_mock = session_mp.setattr('rental_backend.settings.get_settings', get_test_settings)
@@ -66,15 +64,24 @@ def db_dsn_test(session_mp):
 
 
 @pytest.fixture(scope='session')
-def db_container(db_dsn_test):
+def db_container(get_settings_mock):
     """Старт контейнера с БД."""
-    subprocess.run([
-        "docker", "run", "--rm", "-d",
-        "-p", f"{PostgresConfig.external_port}:5432",
-        "-e", f"POSTGRES_HOST_AUTH_METHOD={PostgresConfig.ham}",
-        "--name", PostgresConfig.container_name,
-        PostgresConfig.image
-    ], check=True)
+    subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-d",
+            "-p",
+            f"{PostgresConfig.external_port}:5432",
+            "-e",
+            f"POSTGRES_HOST_AUTH_METHOD={PostgresConfig.ham}",
+            "--name",
+            PostgresConfig.container_name,
+            PostgresConfig.image,
+        ],
+        check=True,
+    )
     time.sleep(3)  # костыльно ждем старта БД.
     alembic_cfg = AlembicConfig(PostgresConfig.alembic_ini)
     command.upgrade(alembic_cfg, "head")
@@ -140,9 +147,6 @@ def another_user_mock(authlib_mock, another_authlib_user):
 @pytest.fixture
 def client(user_mock):
     client = TestClient(app, raise_server_exceptions=False)
-    # print(f'{app.user_middleware=}')
-    # print(f'{app.exception_handlers=}')
-    # client = TestClient(app)
     return client
 
 
@@ -179,7 +183,6 @@ def dbsession(db_container):
         ItemType и RentalSession из БД после тестов => Не запускайте эту фикстуру на
         БД с данными, которые создаете вне тестов!
     """
-    # settings = get_settings()
     engine = create_engine(str(db_container), pool_pre_ping=True)
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()

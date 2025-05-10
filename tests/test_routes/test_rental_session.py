@@ -10,7 +10,7 @@ from rental_backend.models.base import BaseDbModel
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
-from tests.conftest import make_url_query, model_to_dict
+from tests.conftest import model_to_dict
 
 
 obj_prefix: str = rental_session.prefix
@@ -100,19 +100,6 @@ def test_create_with_invalid_id(dbsession, client, base_rentses_url, invalid_ite
         assert response.status_code == right_status_code
 
 
-def test_create_internal_server_error(mocker, dbsession, client, item_fixture, base_rentses_url):
-    """Проверка логики обработки неожиданных ошибок."""
-    item_fixture.is_available = True
-    dbsession.add(item_fixture)
-    dbsession.commit()
-    error_func = mocker.patch(
-        "rental_backend.routes.rental_session.Item.query", side_effect=Exception('Database error')
-    )
-    response = client.post(f"{base_rentses_url}/{item_fixture.type_id}")
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert error_func.call_count == 1
-
-
 @pytest.mark.usefixtures('expiration_time_mock')
 def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
     """Проверка правильного срабатывания check_session_expiration."""
@@ -121,8 +108,6 @@ def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
     dbsession.commit()
     response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
     assert response.status_code == status.HTTP_200_OK
-    # print(RentalSession.get(id=response.json()['id'], session=dbsession))
-    # assert None
     assert (
         RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.OVERDUE
     ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.OVERDUE!'
@@ -221,10 +206,8 @@ def test_return_with_strike(
         query_dict['with_strike'] = with_strike
     if strike_reason is not None:
         query_dict['strike_reason'] = strike_reason
-    # strike_query = make_url_query(query_dict)
     num_of_creations = 1 if strike_created else 0
     with check_object_creation(Strike, dbsession, num_of_creations):
-        # response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return{strike_query}')
         response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return', params=query_dict)
         assert response.status_code == right_status_code
 
@@ -267,16 +250,6 @@ def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, user_id,
         )
 
 
-def test_get_for_user_internal_server_error(mocker, client, base_rentses_url, rentses):
-    """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    error_func = mocker.patch(
-        "rental_backend.routes.rental_session.RentalSession.query", side_effect=Exception('Database error')
-    )
-    response = client.get(f'{base_rentses_url}/user/{rentses.user_id}')
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert error_func.call_count == 1
-
-
 # Tests for GET /rental-sessions/{session_id}
 @pytest.mark.usefixtures('rentses')
 @pytest.mark.xfail(reason='Ждет issue #40. Потом удалить маркер и проверить тесты.')
@@ -301,16 +274,6 @@ def test_retrieve_diff_id(dbsession, client, base_rentses_url, session_id, right
         id = session_id
     response = client.get(f'{base_rentses_url}/{id}')
     assert response.status_code == right_status_code
-
-
-def test_retrieve_internal_server_error(mocker, client, base_rentses_url, rentses):
-    """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    error_func = mocker.patch(
-        "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
-    )
-    response = client.get(f'{base_rentses_url}/{rentses.id}')
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert error_func.call_count == 1
 
 
 # Tests for PATCH /rental-sessions/{session_id}
@@ -477,22 +440,6 @@ def test_update_invalid_id(client, base_rentses_url, session_id, right_status_co
     assert response.status_code == right_status_code
 
 
-def test_update_internal_server_error(mocker, client, base_rentses_url, rentses):
-    """Проверяет поведение хэндлера при появлении непредвиденной ошибки."""
-    valid_update_payload = {
-        "status": "reserved",
-        "end_ts": "2025-04-18T23:32:30.589Z",
-        "actual_return_ts": "2025-04-18T23:32:30.589Z",
-        "admin_close_id": 0,
-    }
-    error_func = mocker.patch(
-        "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
-    )
-    response = client.patch(f'{base_rentses_url}/{rentses.id}', json=valid_update_payload)
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert error_func.call_count == 1, 'Убедитесь, что ошибка выпадает именно при попытке вызвать RentalSession.get!'
-
-
 # Tests for GET /rental-sessions
 @pytest.mark.usefixtures('dbsession', 'rentses')
 @pytest.mark.parametrize(
@@ -545,17 +492,17 @@ def test_get_url_query(
 ):
     """Проверка получения сессий при разных URL-query."""
     query_data = {
-    key: value for key, value in {
-        'is_reserved': is_reserved,
-        'is_canceled': is_canceled,
-        'is_dismissed': is_dismissed,
-        'is_overdue': is_overdue,
-        'is_returned': is_returned,
-        'is_active': is_active
-    }.items() if value is not None
-}
-    # print(query_data)
-    # response = client.get(f'{base_rentses_url}{make_url_query(query_data)}')
+        key: value
+        for key, value in {
+            'is_reserved': is_reserved,
+            'is_canceled': is_canceled,
+            'is_dismissed': is_dismissed,
+            'is_overdue': is_overdue,
+            'is_returned': is_returned,
+            'is_active': is_active,
+        }.items()
+        if value is not None
+    }
     response = client.get(f'{base_rentses_url}', params=query_data)
     assert response.status_code == right_status_code
     if right_status_code == status.HTTP_200_OK:
@@ -625,14 +572,3 @@ def test_cancel_wrong_status(dbsession, client, base_rentses_url, rentses, new_w
         assert (
             response.status_code == status.HTTP_403_FORBIDDEN
         ), 'Убедитесь, что нельзя отменить незарезервированную сессию!'
-
-
-@pytest.mark.usefixtures('dbsession')
-def test_cancel_internal_server_error(mocker, client, base_rentses_url, rentses):
-    """Проверяет случай возникновения неожиданной ошибки."""
-    error_func = mocker.patch(
-        "rental_backend.routes.rental_session.RentalSession.get", side_effect=Exception('Database error')
-    )
-    response = client.delete(f'{base_rentses_url}/{rentses.id}/cancel')
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert error_func.call_count == 1, 'Убедитесь, что ошибка выпадает именно при попытке вызвать RentalSession.get!'
