@@ -71,7 +71,7 @@ def test_get_items_by_type_id(client, items_with_types, item_n, response_status)
         (3, {"is_available": False}, status.HTTP_404_NOT_FOUND),
     ],
 )
-def test_update_comment(client, items_with_types, item_n, body, response_status):
+def test_update_item(client, items_with_types, item_n, body, response_status):
     item_id = -1
     try:
         item_id = items_with_types[item_n].id
@@ -84,3 +84,14 @@ def test_update_comment(client, items_with_types, item_n, body, response_status)
         assert json_responce["id"] == items_with_types[item_n].id
         assert json_responce["type_id"] == items_with_types[item_n].type_id
         assert json_responce["is_available"] != items_with_types[item_n].is_available
+
+def test_delete_item(client, items_with_types):
+    items = items_with_types
+    response = client.delete(f"{url}/{items[0].id}")
+    assert response.status_code == status.HTTP_200_OK
+    # trying to delete deleted
+    response = client.delete(f"{url}/{items[0].id}")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    # trying to get deleted
+    response = client.get(f'{url}/{items[0].id}')
+    assert response.status_code == status.HTTP_404_NOT_FOUND
