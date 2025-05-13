@@ -85,6 +85,7 @@ def test_update_item(client, items_with_types, item_n, body, response_status):
         assert json_responce["type_id"] == items_with_types[item_n].type_id
         assert json_responce["is_available"] != items_with_types[item_n].is_available
 
+
 def test_delete_item(client, items_with_types):
     items = items_with_types
     response = client.delete(f"{url}/{items[0].id}")
