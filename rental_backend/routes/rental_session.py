@@ -41,7 +41,7 @@ async def check_session_expiration(session_id: int):
 
 
 @rental_session.post("/{item_type_id}", response_model=RentalSessionGet)
-async def create_rental_session(item_type_id, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
+async def create_rental_session(item_type_id: int, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
     """
     Создает новую сессию аренды для указанного типа предмета.
 
@@ -78,7 +78,7 @@ async def create_rental_session(item_type_id, background_tasks: BackgroundTasks,
 
 
 @rental_session.patch("/{session_id}/start", response_model=RentalSessionGet)
-async def start_rental_session(session_id, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+async def start_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
     Начинает сессию аренды, изменяя её статус на ACTIVE.
 
@@ -111,7 +111,7 @@ async def start_rental_session(session_id, user=Depends(UnionAuth(scopes=["renta
 
 @rental_session.patch("/{session_id}/return", response_model=RentalSessionGet)
 async def accept_end_rental_session(
-    session_id,
+    session_id: int,
     with_strike: bool = Query(False, description="Флаг, определяющий выдачу страйка"),
     strike_reason: str = Query("", description="Описание причины страйка"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
@@ -167,7 +167,7 @@ async def accept_end_rental_session(
 
 
 @rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
-async def get_user_sessions(user_id, user=Depends(UnionAuth())):
+async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
     """
     Получает список сессий аренды для указанного пользователя.
 
