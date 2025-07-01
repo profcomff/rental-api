@@ -93,9 +93,13 @@ def item_fixture(dbsession, item_type_fixture):
     return item
 
 
-# this fixture creates: data description
 @pytest.fixture(scope="function")
 def items_with_types(dbsession):
+    """Фикстура Item для работы с БД в тестах.
+
+    .. note::
+        Фикстура создает три item: последний с флагом is_available=False
+    """
     item_types = [
         ItemType(name="Type1"),
         ItemType(name="Type2"),

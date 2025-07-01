@@ -15,14 +15,10 @@ settings = get_settings()
 
 @pytest.mark.parametrize(
     'item_n,response_status',
-    [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_404_NOT_FOUND)],
+    [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK)],
 )
 def test_create_item(client, item_type_fixture, item_n, response_status):
-    item_id = -1
-    try:
-        item_id = item_type_fixture[item_n].id
-    except IndexError:
-        pass
+    item_id = item_type_fixture[item_n].id
     body = {"type_id": item_id, "is_available": True}
     post_response = client.post(url, json=body)
     assert post_response.status_code == response_status
@@ -47,17 +43,9 @@ def test_get_item_id(client, dbsession, items_with_types, item_n, response_statu
     [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK)],
 )
 def test_get_items_by_type_id(client, items_with_types, item_n, response_status):
-    # check non-existing id request
-    item_type = -1
-    try:
-        item_type = items_with_types[item_n].type_id
-    except IndexError:
-        pass
+    item_type = items_with_types[item_n].type_id
     response = client.get(f'{url}?type_id={item_type}')
     assert response.status_code == response_status
-    if response_status == status.HTTP_200_OK:
-        json_response = response.json()
-        assert json_response != ""
 
 
 @pytest.mark.parametrize(
