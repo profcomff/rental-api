@@ -69,10 +69,8 @@ def test_get_items_by_type_id(client, items_with_types, item_n, response_status)
 )
 def test_update_item(client, items_with_types, item_n, body, response_status):
     item_id = -1
-    try:
+    if item_n < len(items_with_types):
         item_id = items_with_types[item_n].id
-    except IndexError:
-        pass
     response = client.patch(f"{url}/{item_id}", params=body)
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
