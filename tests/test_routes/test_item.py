@@ -14,12 +14,20 @@ settings = get_settings()
 
 
 @pytest.mark.parametrize(
-    'item_n,response_status',
-    [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK)],
+    'item_n,response_status,availability',
+    [
+        (0, status.HTTP_200_OK, True),
+        (0, status.HTTP_200_OK, True),
+        (1, status.HTTP_200_OK, False),
+        (1, status.HTTP_422_UNPROCESSABLE_ENTITY, 'abc'),
+        (2, status.HTTP_404_NOT_FOUND, True),
+    ],
 )
-def test_create_item(client, item_type_fixture, item_n, response_status):
-    item_id = item_type_fixture[item_n].id
-    body = {"type_id": item_id, "is_available": True}
+def test_create_item(client, item_type_fixture, item_n, response_status, availability):
+    item_id = -1
+    if item_n < len(item_type_fixture):
+        item_id = item_type_fixture[item_n].id
+    body = {"type_id": item_id, "is_available": availability}
     post_response = client.post(url, json=body)
     assert post_response.status_code == response_status
 
@@ -43,8 +51,8 @@ def test_get_item_id(client, dbsession, items_with_types, item_n, response_statu
     [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK)],
 )
 def test_get_items_by_type_id(client, items_with_types, item_n, response_status):
-    item_type = items_with_types[item_n].type_id
-    response = client.get(f'{url}?type_id={item_type}')
+    query = {"item_type": f'{items_with_types[item_n].type_id}'}
+    response = client.get(f'{url}', params=query)
     assert response.status_code == response_status
 
 

@@ -80,7 +80,7 @@ def item_type_fixture(dbsession):
     return item_types
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def item_fixture(dbsession, item_type_fixture):
     """Фикстура Item.
 
@@ -93,9 +93,9 @@ def item_fixture(dbsession, item_type_fixture):
     return item
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def items_with_types(dbsession):
-    """Фикстура Item для работы с БД в тестах.
+    """Фикстура Item.
 
     .. note::
         Фикстура создает три item: последний с флагом is_available=False
