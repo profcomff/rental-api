@@ -5,8 +5,9 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rental_backend.exceptions import DateRangeError
+from rental_backend.exceptions import DateRangeError, ObjectNotFound
 from rental_backend.models.db import Strike
+from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import StrikeGet, StrikePost
 from rental_backend.utils.action import ActionLogger
 
@@ -57,7 +58,7 @@ async def get_strikes(
     if session_id is not None:
         query = query.filter(Strike.session_id == session_id)
     if from_date is not None and to_date is not None:
-        query = query.filter(Strike.created_ts.between(from_date, to_date))
+        query = query.filter(Strike.create_ts.between(from_date, to_date))
     strikes = query.all()
     return [StrikeGet.model_validate(strike) for strike in strikes]
 

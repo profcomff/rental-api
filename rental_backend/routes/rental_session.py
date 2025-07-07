@@ -41,7 +41,7 @@ async def check_session_expiration(session_id: int):
 
 
 @rental_session.post("/{item_type_id}", response_model=RentalSessionGet)
-async def create_rental_session(item_type_id, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
+async def create_rental_session(item_type_id: int, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
     """
     Создает новую сессию аренды для указанного типа предмета.
 
@@ -78,7 +78,7 @@ async def create_rental_session(item_type_id, background_tasks: BackgroundTasks,
 
 
 @rental_session.patch("/{session_id}/start", response_model=RentalSessionGet)
-async def start_rental_session(session_id, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+async def start_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
     Начинает сессию аренды, изменяя её статус на ACTIVE.
 
@@ -111,7 +111,7 @@ async def start_rental_session(session_id, user=Depends(UnionAuth(scopes=["renta
 
 @rental_session.patch("/{session_id}/return", response_model=RentalSessionGet)
 async def accept_end_rental_session(
-    session_id,
+    session_id: int,
     with_strike: bool = Query(False, description="Флаг, определяющий выдачу страйка"),
     strike_reason: str = Query("", description="Описание причины страйка"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
@@ -167,7 +167,7 @@ async def accept_end_rental_session(
 
 
 @rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
-async def get_user_sessions(user_id, user=Depends(UnionAuth())):
+async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
     """
     Получает список сессий аренды для указанного пользователя.
 
@@ -282,13 +282,20 @@ async def update_rental_session(
     upd_data = update_data.model_dump(exclude_unset=True)
 
     updated_session = RentalSession.update(session=db.session, id=session_id, **upd_data)
-
     ActionLogger.log_event(
         user_id=session.user_id,
         admin_id=user.get("id"),
         session_id=session.id,
         action_type="UPDATE_SESSION",
-        details={"status": session.status, "end_ts": session.end_ts, "actual_return_ts": session.actual_return_ts},
+        details={
+            "status": session.status,
+            "end_ts": updated_session.end_ts.isoformat(timespec="milliseconds") if "end_ts" in upd_data else None,
+            "actual_return_ts": (
+                updated_session.actual_return_ts.isoformat(timespec="milliseconds")
+                if "actual_return_ts" in upd_data
+                else None
+            ),
+        },
     )
 
     return RentalSessionGet.model_validate(updated_session)
