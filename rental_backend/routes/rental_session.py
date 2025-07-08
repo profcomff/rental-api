@@ -1,8 +1,7 @@
-import asyncio
 import datetime
 
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
@@ -16,37 +15,36 @@ rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
 RENTAL_SESSION_EXPIRY = datetime.timedelta(minutes=10)
 
 
-async def check_session_expiration(session_id: int):
+def check_session_expiration(rental_session: RentalSession) -> RentalSession:
     """
-    Фоновая задача для проверки и истечения срока аренды.
+    Проверяет возвращаемые сессии на то просрочена ли она.
+    В случае просрочки устанавливает сессии статус OVERDUE, а item: is_available=True
 
-    :param session_id: Идентификатор сессии аренды.
+    :param rental_session: Сессия для проверки
     """
-    await asyncio.sleep(RENTAL_SESSION_EXPIRY.total_seconds())
-    session = RentalSession.query(session=db.session).filter(RentalSession.id == session_id).one_or_none()
-    if session and session.status == RentStatus.RESERVED:
-        RentalSession.update(
-            session=db.session,
-            id=session_id,
-            status=RentStatus.OVERDUE,
-        )
-        Item.update(session=db.session, id=session.item_id, is_available=True)
+    if (
+        rental_session
+        and rental_session.status == RentStatus.RESERVED
+        and rental_session.reservation_ts + RENTAL_SESSION_EXPIRY < datetime.datetime.now(tz=datetime.timezone.utc)
+    ):
+        rental_session.status = RentStatus.OVERDUE
+        Item.update(session=db.session, id=rental_session.item_id, is_available=True)
         ActionLogger.log_event(
-            user_id=session.user_id,
+            user_id=rental_session.user_id,
             admin_id=None,
-            session_id=session.id,
+            session_id=rental_session.id,
             action_type="EXPIRE_SESSION",
             details={"status": RentStatus.OVERDUE},
         )
+    return rental_session
 
 
 @rental_session.post("/{item_type_id}", response_model=RentalSessionGet)
-async def create_rental_session(item_type_id: int, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
+async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
     """
     Создает новую сессию аренды для указанного типа предмета.
 
     :param item_type_id: Идентификатор типа предмета.
-    :param background_tasks: Фоновые задачи для выполнения.
     :return: Объект RentalSessionGet с информацией о созданной сессии аренды.
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
     """
@@ -63,8 +61,6 @@ async def create_rental_session(item_type_id: int, background_tasks: BackgroundT
         status=RentStatus.RESERVED,
     )
     Item.update(session=db.session, id=available_items[0].id, is_available=False)
-
-    background_tasks.add_task(check_session_expiration, session.id)
 
     ActionLogger.log_event(
         user_id=user.get("id"),
@@ -174,24 +170,19 @@ async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
     :param user_id: id пользователя.
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
-    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
-    return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
-
-
-@rental_session.get("/{session_id}", response_model=RentalSessionGet)
-async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
-    session = RentalSession.get(id=session_id, session=db.session)
-
-    return RentalSessionGet.model_validate(session)
+    user_sessions: list[RentalSession] = (
+        RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
+    )
+    return [RentalSessionGet.model_validate(check_session_expiration(user_session)) for user_session in user_sessions]
 
 
 @rental_session.get("", response_model=list[RentalSessionGet])
 async def get_rental_sessions(
-    is_reserved: bool = Query(False, description="флаг, показывать заявки"),
+    is_reserved: bool = Query(False, description="Флаг, показывать заявки"),
     is_canceled: bool = Query(False, description="Флаг, показывать отмененные"),
     is_dismissed: bool = Query(False, description="Флаг, показывать отклоненные"),
     is_overdue: bool = Query(False, description="Флаг, показывать просроченные"),
-    is_returned: bool = Query(False, description="Флаг, показывать вернутые"),
+    is_returned: bool = Query(False, description="Флаг, показывать возаращённые"),
     is_active: bool = Query(False, description="Флаг, показывать активные"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
@@ -220,14 +211,23 @@ async def get_rental_sessions(
     if is_active:
         to_show.append(RentStatus.ACTIVE)
 
-    rent_sessions = RentalSession.query(session=db.session).filter(RentalSession.status.in_(to_show)).all()
-    return [RentalSessionGet.model_validate(rent_session) for rent_session in rent_sessions]
+    rent_sessions: list[RentalSession] = (
+        RentalSession.query(session=db.session).filter(RentalSession.status.in_(to_show)).all()
+    )
+    result: list[RentalSessionGet] = []
+    for rent_session in rent_sessions:
+        check_session_expiration(rent_session)
+        if rent_session.status == RentStatus.OVERDUE and not is_overdue:
+            continue
+        else:
+            result.append(RentalSessionGet.model_validate(rent_session))
+    return result
 
 
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
 async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     session = RentalSession.get(id=session_id, session=db.session)
-    return RentalSessionGet.model_validate(session)
+    return RentalSessionGet.model_validate(check_session_expiration(session))
 
 
 @rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
@@ -279,6 +279,7 @@ async def update_rental_session(
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:
         raise ObjectNotFound(RentalSession, session_id)
+    check_session_expiration(session)
     upd_data = update_data.model_dump(exclude_unset=True)
 
     updated_session = RentalSession.update(session=db.session, id=session_id, **upd_data)
