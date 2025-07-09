@@ -412,7 +412,6 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     print(f'В конце {model_to_dict(rentses)}')
     new_model_fields = model_to_dict(rentses)
     is_really_updated = old_model_fields != new_model_fields
-    assert False
     assert is_really_updated == update_in_db
 
 
