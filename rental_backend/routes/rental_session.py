@@ -289,10 +289,13 @@ async def update_rental_session(
         action_type="UPDATE_SESSION",
         details={
             "status": session.status,
-            "end_ts": updated_session.end_ts.isoformat(timespec="milliseconds") if "end_ts" in upd_data else None,
+            "end_ts": (
+                updated_session.end_ts.isoformat(timespec="milliseconds")
+                if "end_ts" in upd_data and upd_data['end_ts'] is not None
+                else None),
             "actual_return_ts": (
                 updated_session.actual_return_ts.isoformat(timespec="milliseconds")
-                if "actual_return_ts" in upd_data
+                if "actual_return_ts" in upd_data and upd_data['actual_return_ts'] is not None
                 else None
             ),
         },
