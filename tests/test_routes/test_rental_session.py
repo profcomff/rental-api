@@ -252,7 +252,6 @@ def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, user_id,
 
 # Tests for GET /rental-sessions/{session_id}
 @pytest.mark.usefixtures('rentses')
-@pytest.mark.xfail(reason='Ждет issue #40. Потом удалить маркер и проверить тесты.')
 @pytest.mark.parametrize(
     'session_id, right_status_code',
     [
@@ -260,11 +259,10 @@ def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, user_id,
         ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-        (-2, status.HTTP_200_OK),
-        ('', status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ('-1?hoho=hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
+        (-2, status.HTTP_404_NOT_FOUND),
+        ('-1?hoho=hihi', status.HTTP_404_NOT_FOUND),
     ],
-    ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'empty', 'excess_query'],
+    ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'excess_query'],
 )
 def test_retrieve_diff_id(dbsession, client, base_rentses_url, session_id, right_status_code):
     """Проверка получения сессии по разным URL-path."""
@@ -406,12 +404,15 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     """Проверка поведения при разном теле запроса."""
     old_model_fields = model_to_dict(rentses)
     response = client.patch(f"{base_rentses_url}/{rentses.id}", json=payload)
+    print(f'В начале{model_to_dict(rentses)}')
     if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
         pytest.xfail(reason='Ждут issue #39. Удалить маркер, когда баг будет устранен.')
     assert response.status_code == right_status_code
     dbsession.refresh(rentses)
+    print(f'В конце {model_to_dict(rentses)}')
     new_model_fields = model_to_dict(rentses)
     is_really_updated = old_model_fields != new_model_fields
+    assert False
     assert is_really_updated == update_in_db
 
 
