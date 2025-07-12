@@ -12,4 +12,3 @@ class ActionLogger:
             user_id=user_id, admin_id=admin_id, session_id=session_id, action_type=action_type, details=details
         )
         db.session.add(event)
-        db.session.commit()
