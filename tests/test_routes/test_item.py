@@ -51,7 +51,7 @@ def test_get_item_id(client, dbsession, items_with_types, item_n, response_statu
     [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK)],
 )
 def test_get_items_by_type_id(client, items_with_types, item_n, response_status):
-    query = {"item_type": f'{items_with_types[item_n].type_id}'}
+    query = {"type_id": f'{items_with_types[item_n].type_id}'}
     response = client.get(f'{url}', params=query)
     assert response.status_code == response_status
 
@@ -74,10 +74,10 @@ def test_update_item(client, items_with_types, item_n, body, response_status):
     response = client.patch(f"{url}/{item_id}", params=body)
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
-        json_responce = response.json()
-        assert json_responce["id"] == items_with_types[item_n].id
-        assert json_responce["type_id"] == items_with_types[item_n].type_id
-        assert json_responce["is_available"] != items_with_types[item_n].is_available
+        json_response = response.json()
+        assert json_response["id"] == items_with_types[item_n].id
+        assert json_response["type_id"] == items_with_types[item_n].type_id
+        assert json_response["is_available"] != items_with_types[item_n].is_available
 
 
 def test_delete_item(client, items_with_types):
