@@ -83,10 +83,13 @@ def db_container(get_settings_mock):
         check=True,
     )
     time.sleep(3)  # костыльно ждем старта БД.
-    alembic_cfg = AlembicConfig(PostgresConfig.alembic_ini)
+    print(str(PostgresConfig.alembic_ini.resolve()))
+    alembic_cfg = AlembicConfig(str(PostgresConfig.alembic_ini.resolve()))
     command.upgrade(alembic_cfg, "head")
     yield PostgresConfig.get_url()
-    subprocess.run(["docker", "stop", PostgresConfig.container_name], check=True)
+    subprocess.run(
+        ["docker", "stop", PostgresConfig.container_name], check=True
+    )  # FIXME: сделать это исполнение вызова даже при ошибке в подъеме БД!
 
 
 @pytest.fixture
