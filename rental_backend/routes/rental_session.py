@@ -4,6 +4,7 @@ import datetime
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
+from sqlalchemy.orm import joinedload
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
@@ -175,20 +176,17 @@ async def get_user_sessions(user_id, user=Depends(UnionAuth())):
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
 
-    results = (
-        db.session.query(RentalSession, Strike.id.label("strike_id"))
-        .outerjoin(Strike, RentalSession.id == Strike.session_id)
+    sessions = (
+        db.session.query(RentalSession)
+        .options(joinedload(RentalSession.strike))
         .filter(RentalSession.user_id == user_id)
         .all()
     )
 
-    response = []
-    for session, strike_id in results:
-        session_data = RentalSessionGet.model_validate(session)
-        session_data.strike_id = strike_id
-        response.append(session_data)
-
-    return response
+    return [
+        RentalSessionGet(**session.to_dict(), strike_id=session.strike.id if session.strike else None)
+        for session in sessions
+    ]
 
 
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
@@ -202,7 +200,7 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     )
 
     if not result:
-        raise ObjectNotFound("Сессия не найдена")
+        raise ObjectNotFound(RentalSession, session_id)
 
     session, strike_id = result
 
