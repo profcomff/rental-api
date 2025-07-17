@@ -4,6 +4,7 @@ import datetime
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
+from sqlalchemy.orm import joinedload
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
@@ -174,15 +175,39 @@ async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
     :param user_id: id пользователя.
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
-    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
-    return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
+
+    sessions = (
+        db.session.query(RentalSession)
+        .options(joinedload(RentalSession.strike))
+        .filter(RentalSession.user_id == user_id)
+        .all()
+    )
+
+    return [
+        RentalSessionGet(**session.to_dict(), strike_id=session.strike.id if session.strike else None)
+        for session in sessions
+    ]
 
 
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
 async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
-    session = RentalSession.get(id=session_id, session=db.session)
 
-    return RentalSessionGet.model_validate(session)
+    result = (
+        db.session.query(RentalSession, Strike.id.label("strike_id"))
+        .outerjoin(Strike, RentalSession.id == Strike.session_id)
+        .filter(RentalSession.id == session_id)
+        .first()
+    )
+
+    if not result:
+        raise ObjectNotFound(RentalSession, session_id)
+
+    session, strike_id = result
+
+    session_data = RentalSessionGet.model_validate(session)
+    session_data.strike_id = strike_id
+
+    return session_data
 
 
 @rental_session.get("", response_model=list[RentalSessionGet])
@@ -220,14 +245,20 @@ async def get_rental_sessions(
     if is_active:
         to_show.append(RentStatus.ACTIVE)
 
-    rent_sessions = RentalSession.query(session=db.session).filter(RentalSession.status.in_(to_show)).all()
-    return [RentalSessionGet.model_validate(rent_session) for rent_session in rent_sessions]
+    results = (
+        db.session.query(RentalSession, Strike.id.label("strike_id"))
+        .outerjoin(Strike, RentalSession.id == Strike.session_id)
+        .filter(RentalSession.status.in_(to_show))
+        .all()
+    )
 
+    response = []
+    for session, strike_id in results:
+        session_data = RentalSessionGet.model_validate(session)
+        session_data.strike_id = strike_id
+        response.append(session_data)
 
-@rental_session.get("/{session_id}", response_model=RentalSessionGet)
-async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
-    session = RentalSession.get(id=session_id, session=db.session)
-    return RentalSessionGet.model_validate(session)
+    return response
 
 
 @rental_session.delete("/{session_id}/cancel", response_model=RentalSessionGet)
