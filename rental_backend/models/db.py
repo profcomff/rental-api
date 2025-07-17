@@ -47,6 +47,7 @@ class RentalSession(BaseDbModel):
     end_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     actual_return_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     status: Mapped[RentStatus] = mapped_column(String, nullable=False)
+    strike = relationship("Strike", uselist=False, back_populates="session")
 
     strike = relationship("Strike", uselist=False, back_populates="session")
     item: Mapped["Item"] = relationship("Item")
