@@ -166,18 +166,6 @@ async def accept_end_rental_session(
     return RentalSessionGet.model_validate(ended_session)
 
 
-@rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
-async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
-    """
-    Получает список сессий аренды для указанного пользователя.
-
-    :param user_id: id пользователя.
-    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
-    """
-    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
-    return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
-
-
 @rental_session.get("/user/me", response_model=list[RentalSessionGet])
 async def get_my_sessions(
     is_reserved: bool = Query(False, description="флаг, показывать заявки"),
@@ -189,7 +177,7 @@ async def get_my_sessions(
     user=Depends(UnionAuth()),
 ):
     """
-    Получает список сессий аренды текущего пользователя с возможностью фильтрации.
+    Получает список сессий аренды с возможностью фильтрации по статусу.
 
     :param is_reserved: Флаг, показывать зарезервированные сессии.
     :param is_canceled: Флаг, показывать отмененные сессии.
@@ -197,7 +185,7 @@ async def get_my_sessions(
     :param is_overdue: Флаг, показывать просроченные сессии.
     :param is_returned: Флаг, показывать возвращенные сессии.
     :param is_active: Флаг, показывать активные сессии.
-    :return: Список сессий аренды пользователя.
+    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
     to_show = []
     if is_reserved:
@@ -212,10 +200,19 @@ async def get_my_sessions(
         to_show.append(RentStatus.RETURNED)
     if is_active:
         to_show.append(RentStatus.ACTIVE)
-    query = RentalSession.query(session=db.session).filter(RentalSession.user_id == user.id)
-    if to_show:
-        query = query.filter(RentalSession.status.in_(to_show))
-    user_sessions = query.all()
+    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user.get("id")).all()
+    return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
+
+
+@rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
+async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
+    """
+    Получает список сессий аренды для указанного пользователя.
+
+    :param user_id: id пользователя.
+    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
+    """
+    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
     return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
 
 
