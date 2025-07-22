@@ -54,10 +54,3 @@ async def inactive_session_error_handler(req: starlette.requests.Request, exc: I
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=409
     )
-
-
-@app.exception_handler(ForbiddenAction)
-async def forbidden_action_error_handler(req: starlette.requests.Request, exc: ForbiddenAction):
-    return JSONResponse(
-        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=403
-    )
