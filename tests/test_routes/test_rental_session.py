@@ -95,8 +95,6 @@ def test_create_with_invalid_id(dbsession, client, base_rentses_url, invalid_ite
     """Проверка логики метода с невалидным item_type_id."""
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
         response = client.post(f'{base_rentses_url}/{invalid_itemtype_id}')
-        # if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        #     pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
         assert response.status_code == right_status_code
 
 
@@ -136,8 +134,6 @@ def test_start_with_diff_id(dbsession, client, rentses, base_rentses_url, sessio
         new_status = rentses.status
     with check_object_update(rentses, dbsession, status=new_status):
         response = client.patch(f'{base_rentses_url}/{id}/start')
-        # if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        #     pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
         assert response.status_code == right_status_code
 
 
@@ -164,8 +160,6 @@ def test_return_with_diff_id(dbsession, client, active_rentses, base_rentses_url
         new_status = active_rentses.status
     with check_object_update(active_rentses, dbsession, status=new_status):
         response = client.patch(f'{base_rentses_url}/{id}/return')
-        # if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        #     pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
         assert response.status_code == right_status_code
 
 
@@ -239,8 +233,6 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
 def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, user_id, right_status_code):
     """Проверка логики метода с разным user_id."""
     response = client.get(f'{base_rentses_url}/user/{user_id}')
-    # if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-    #     pytest.xfail(reason='Ждет issue #40. Удалить маркер и проверить работоспособность.')
     assert response.status_code == right_status_code
     if right_status_code == status.HTTP_200_OK:
         returned_queue = response.json()
@@ -405,8 +397,6 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     old_model_fields = model_to_dict(rentses)
     response = client.patch(f"{base_rentses_url}/{rentses.id}", json=payload)
     print(f'В начале{model_to_dict(rentses)}')
-    if response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR:
-        pytest.xfail(reason='Ждут issue #39. Удалить маркер, когда баг будет устранен.')
     assert response.status_code == right_status_code
     dbsession.refresh(rentses)
     print(f'В конце {model_to_dict(rentses)}')
