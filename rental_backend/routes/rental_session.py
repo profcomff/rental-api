@@ -200,7 +200,10 @@ async def get_my_sessions(
         to_show.append(RentStatus.RETURNED)
     if is_active:
         to_show.append(RentStatus.ACTIVE)
-    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user.get("id")).all()
+    query = RentalSession.query(session=db.session).filter(RentalSession.user_id == user.get("id"))
+    if to_show:
+        query = query.filter(RentalSession.status.in_(to_show))
+    user_sessions = query.all()
     return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
 
 
