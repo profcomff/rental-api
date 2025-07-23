@@ -178,9 +178,11 @@ async def accept_end_rental_session(
 
 
 @rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
-async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
+async def get_user_sessions(user_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
     Retrieves a list of rental sessions for the specified user.
+
+    Scopes: `["rental.session.admin"]`
 
     - **user_id**: The ID of the user.
 
