@@ -29,7 +29,15 @@ def test_create_item_type(client, item_type_fixture, item_n, response_status):
 
 
 @pytest.mark.parametrize('response_status', [status.HTTP_200_OK])
-def test_get_item_type(client, item_type_fixture, response_status):
+def test_get_item_type_200(client, item_type_fixture, response_status):
+    # 200_OK as any item types are found
+    get_response = client.get(url)
+    assert get_response.status_code == response_status
+
+
+@pytest.mark.parametrize('response_status', [status.HTTP_404_NOT_FOUND])
+def test_get_item_type_404(client, response_status):
+    # 404_NOT_FOUND as no item types are found
     get_response = client.get(url)
     assert get_response.status_code == response_status
 
@@ -50,9 +58,25 @@ def test_get_item_type_id(client, item_n, item_type_fixture, response_status):
     assert response.status_code == response_status
 
 
-@pytest.mark.parametrize('response_status', [status.HTTP_200_OK])
-def test_update_item_type(client, item_type_fixture, dbsession, response_status):
-    pass
+@pytest.mark.parametrize(
+    'item_n,body,response_status',
+    [
+        (0, {"name": True}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        (1, {"name": "TestOK"}, status.HTTP_200_OK),
+        # Non-existent id
+        (2, {"name": "TestBAD"}, status.HTTP_404_NOT_FOUND),
+    ],
+)
+def test_update_item_type(client, dbsession, item_n, body, item_type_fixture, response_status):
+    item_type_id = -1
+    if item_n < len(item_type_fixture):
+        item_type_id = item_type_fixture[item_n].id
+    response = client.patch(f"{url}/{item_type_id}", json=body)
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        json_response = response.json()
+        assert json_response["id"] == item_type_fixture[item_n].id
+        assert json_response["name"] == body["name"]
 
 
 def test_delete_item_type(client, item_type_fixture):
