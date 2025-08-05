@@ -32,14 +32,14 @@ def test_create_item_type(client, item_type_fixture, item_n, response_status):
 def test_get_item_type_200(client, item_type_fixture, response_status):
     # 200_OK as any item types are found
     get_response = client.get(url)
-    assert get_response.status_code == response_status
-
-
-@pytest.mark.parametrize('response_status', [status.HTTP_404_NOT_FOUND])
-def test_get_item_type_404(client, response_status):
+    assert get_response.status_code == status.HTTP_200_OK
+    response = client.delete(f"{url}/{item_type_fixture[0].id}")
+    assert response.status_code == status.HTTP_200_OK
+    response = client.delete(f"{url}/{item_type_fixture[1].id}")
+    assert response.status_code == status.HTTP_200_OK
     # 404_NOT_FOUND as no item types are found
     get_response = client.get(url)
-    assert get_response.status_code == response_status
+    assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.parametrize(
@@ -82,6 +82,8 @@ def test_update_item_type(client, dbsession, item_n, body, item_type_fixture, re
 def test_delete_item_type(client, item_type_fixture):
     response = client.delete(f"{url}/{item_type_fixture[0].id}")
     assert response.status_code == status.HTTP_200_OK
+    # checking if items are not deleted
+    assert item_type_fixture[0].items == []
     # trying to delete deleted
     response = client.delete(f"{url}/{item_type_fixture[0].id}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
