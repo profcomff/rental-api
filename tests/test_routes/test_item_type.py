@@ -28,8 +28,7 @@ def test_create_item_type(client, item_type_fixture, item_n, response_status):
     assert post_response.status_code == response_status
 
 
-@pytest.mark.parametrize('response_status', [status.HTTP_200_OK])
-def test_get_item_type_200(client, item_type_fixture, response_status):
+def test_get_item_type(client, item_type_fixture):
     # 200_OK as any item types are found
     get_response = client.get(url)
     assert get_response.status_code == status.HTTP_200_OK
