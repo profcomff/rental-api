@@ -234,7 +234,7 @@ def item_fixture(dbsession, item_type_fixture):
     .. note::
         Очистка производится в dbsession.
     """
-    item = Item(type_id=item_type_fixture.id)
+    item = Item(type_id=item_type_fixture[0].id)
     dbsession.add(item)
     dbsession.commit()
     return item
