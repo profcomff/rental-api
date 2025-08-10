@@ -396,10 +396,8 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     """Проверка поведения при разном теле запроса."""
     old_model_fields = model_to_dict(rentses)
     response = client.patch(f"{base_rentses_url}/{rentses.id}", json=payload)
-    print(f'В начале{model_to_dict(rentses)}')
     assert response.status_code == right_status_code
     dbsession.refresh(rentses)
-    print(f'В конце {model_to_dict(rentses)}')
     new_model_fields = model_to_dict(rentses)
     is_really_updated = old_model_fields != new_model_fields
     assert is_really_updated == update_in_db
