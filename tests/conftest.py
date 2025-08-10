@@ -66,10 +66,12 @@ def get_settings_mock(session_mp):
 
 @pytest.fixture(scope="session")
 def db_container(get_settings_mock):
-    container = PostgresContainer(image=PostgresConfig.image, port=PostgresConfig.external_port, dbname=PostgresConfig.container_name) \
+    container = PostgresContainer(image=PostgresConfig.image, username=PostgresConfig.username, dbname=PostgresConfig.container_name) \
+        .with_bind_ports(5432, PostgresConfig.external_port) \
         .with_env("POSTGRES_HOST_AUTH_METHOD", PostgresConfig.ham)
     container.start()
     cfg = AlembicConfig(str(PostgresConfig.alembic_ini.resolve()))
+    cfg.set_main_option("script_location", "%(here)s/migrations")
     command.upgrade(cfg, "head")
     try:
         yield PostgresConfig.get_url()
