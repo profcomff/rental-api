@@ -13,6 +13,7 @@ from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from testcontainers.postgres import PostgresContainer
 
 from rental_backend.models.db import *
 from rental_backend.routes import app
@@ -63,33 +64,17 @@ def get_settings_mock(session_mp):
     return dsn_mock
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def db_container(get_settings_mock):
-    """Старт контейнера с БД."""
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "-d",
-            "-p",
-            f"{PostgresConfig.external_port}:5432",
-            "-e",
-            f"POSTGRES_HOST_AUTH_METHOD={PostgresConfig.ham}",
-            "--name",
-            PostgresConfig.container_name,
-            PostgresConfig.image,
-        ],
-        check=True,
-    )
-    time.sleep(3)  # костыльно ждем старта БД.
-    print(str(PostgresConfig.alembic_ini.resolve()))
-    alembic_cfg = AlembicConfig(str(PostgresConfig.alembic_ini.resolve()))
-    command.upgrade(alembic_cfg, "head")
-    yield PostgresConfig.get_url()
-    subprocess.run(
-        ["docker", "stop", PostgresConfig.container_name], check=True
-    )  # FIXME: сделать это исполнение вызова даже при ошибке в подъеме БД!
+    container = PostgresContainer(image=PostgresConfig.image, port=PostgresConfig.external_port, dbname=PostgresConfig.container_name) \
+        .with_env("POSTGRES_HOST_AUTH_METHOD", PostgresConfig.ham)
+    container.start()
+    cfg = AlembicConfig(str(PostgresConfig.alembic_ini.resolve()))
+    command.upgrade(cfg, "head")
+    try:
+        yield PostgresConfig.get_url()
+    finally:
+        container.stop()
 
 
 @pytest.fixture
