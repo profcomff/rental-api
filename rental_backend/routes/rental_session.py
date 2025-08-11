@@ -61,6 +61,7 @@ async def create_rental_session(item_type_id: int, background_tasks: BackgroundT
         session=db.session,
         user_id=user.get("id"),
         item_id=available_items[0].id,
+        item_type_id=item_type_id,
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
     )

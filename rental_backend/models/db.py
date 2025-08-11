@@ -37,6 +37,7 @@ class RentalSession(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer)
     item_id: Mapped[int] = mapped_column(Integer, ForeignKey("item.id"))
+    item_type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"))
     admin_open_id: Mapped[int] = mapped_column(Integer, nullable=True)
     admin_close_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reservation_ts: Mapped[datetime.datetime] = mapped_column(
