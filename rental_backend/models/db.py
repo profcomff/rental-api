@@ -46,6 +46,11 @@ class RentalSession(BaseDbModel):
     end_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     actual_return_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     status: Mapped[RentStatus] = mapped_column(String, nullable=False)
+    item: Mapped["Item"] = relationship("Item")
+
+    @property
+    def item_type_id(self) -> int:
+        return self.item.type_id if self.item else None
 
 
 class Event(BaseDbModel):
