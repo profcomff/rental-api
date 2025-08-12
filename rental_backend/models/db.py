@@ -53,12 +53,6 @@ class RentalSession(BaseDbModel):
     def item_type_id(self) -> int | None:
         return self.item.type_id if self.item else None
 
-    @item_type_id.expression
-    def item_type_id(cls):
-        from routes.item import Item
-
-        return Item.type_id
-
 
 class Event(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
