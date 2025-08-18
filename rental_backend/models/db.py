@@ -16,6 +16,7 @@ class RentStatus(str, Enum):
     OVERDUE: str = "overdue"
     RETURNED: str = "returned"
     DISMISSED: str = "dismissed"
+    EXPIRED: str = "expired"
 
 
 class Item(BaseDbModel):

@@ -8,6 +8,7 @@ from rental_backend.exceptions import (
     InactiveSession,
     NoneAvailable,
     ObjectNotFound,
+    SessionExists,
 )
 from rental_backend.schemas.base import StatusResponseModel
 
@@ -56,8 +57,8 @@ async def inactive_session_error_handler(req: starlette.requests.Request, exc: I
     )
 
 
-@app.exception_handler(ForbiddenAction)
-async def forbidden_action_error_handler(req: starlette.requests.Request, exc: ForbiddenAction):
+@app.exception_handler(SessionExists)
+async def session_exists_error_handler(req: starlette.requests.Request, exc: SessionExists):
     return JSONResponse(
-        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=403
+        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=409
     )
