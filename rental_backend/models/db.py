@@ -4,6 +4,7 @@ import datetime
 from enum import Enum
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseDbModel
@@ -47,6 +48,11 @@ class RentalSession(BaseDbModel):
     end_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     actual_return_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     status: Mapped[RentStatus] = mapped_column(String, nullable=False)
+    item: Mapped["Item"] = relationship("Item")
+
+    @hybrid_property
+    def item_type_id(self) -> int | None:
+        return self.item.type_id if self.item else None
 
 
 class Event(BaseDbModel):

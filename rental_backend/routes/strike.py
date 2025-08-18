@@ -19,6 +19,15 @@ strike = APIRouter(prefix="/strike", tags=["Strike"])
 async def create_strike(
     strike_info: StrikePost, user=Depends(UnionAuth(scopes=["rental.strike.create"], allow_none=False))
 ) -> StrikeGet:
+    """
+    Creates a new strike.
+
+    Scopes: `["rental.strike.create"]`
+
+    - **strike_info**: The data for the new strike.
+
+    Returns the created strike.
+    """
     new_strike = Strike.create(
         session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
     )
@@ -34,6 +43,13 @@ async def create_strike(
 
 @strike.get("/user/{user_id}", response_model=list[StrikeGet])
 async def get_user_strikes(user_id: int) -> list[StrikeGet]:
+    """
+    Retrieves a list of strikes for a specific user.
+
+    - **user_id**: The ID of the user.
+
+    Returns a list of strikes.
+    """
     strikes = Strike.query(session=db.session).filter(Strike.user_id == user_id).all()
     return [StrikeGet.model_validate(strike) for strike in strikes]
 
@@ -47,6 +63,20 @@ async def get_strikes(
     to_date: Optional[datetime.datetime] = Query(None),
     user=Depends(UnionAuth(scopes=["rental.strike.read"], allow_none=False)),
 ) -> list[StrikeGet]:
+    """
+    Retrieves a list of strikes with optional filtering.
+
+    Scopes: `["rental.strike.read"]`
+
+    - **admin_id**: Filter strikes by admin ID.
+    - **session_id**: Filter strikes by session ID.
+    - **from_date**: Filter strikes created after this date.
+    - **to_date**: Filter strikes created before this date.
+
+    Returns a list of strikes.
+
+    Raises **DateRangeError** if only one of `from_date` or `to_date` is provided.
+    """
     if (from_date is None) != (to_date is None):
         raise DateRangeError()
 
@@ -65,6 +95,17 @@ async def get_strikes(
 
 @strike.delete("/{id}")
 async def delete_strike(id: int, user=Depends(UnionAuth(scopes=["rental.strike.delete"], allow_none=False))) -> dict:
+    """
+    Deletes a strike by its ID.
+
+    Scopes: `["rental.strike.delete"]`
+
+    - **id**: The ID of the strike to delete.
+
+    Returns a status response.
+
+    Raises **ObjectNotFound** if the strike with the specified ID is not found.
+    """
     strike = Strike.get(id, session=db.session)
     if strike is None:
         raise ObjectNotFound(Strike, id)

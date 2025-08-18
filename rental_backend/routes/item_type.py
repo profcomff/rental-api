@@ -17,11 +17,13 @@ item_type = APIRouter(prefix="/itemtype", tags=["ItemType"])
 @item_type.get("/{id}", response_model=ItemTypeGet)
 async def get_item_type(id: int) -> ItemTypeGet:
     """
-    Получает информацию о типе предмета по его id.
+    Retrieves information about an item type by its ID.
 
-    :param id: Идентификатор типа предмета.
-    :return: Объект ItemTypeGet с информацией о типе предмета.
-    :raises ObjectNotFound: Если тип предмета с указанным идентификатором не найден.
+    - **id**: The ID of the item type.
+
+    Returns the item type information.
+
+    Raises **ObjectNotFound** if the item type with the specified ID is not found.
     """
     item_type: ItemType = ItemType.query(session=db.session).filter(ItemType.id == id).one_or_none()
     if item_type is None:
@@ -34,10 +36,11 @@ async def get_item_type(id: int) -> ItemTypeGet:
 @item_type.get("", response_model=list[ItemTypeGet])
 async def get_items_types() -> list[ItemTypeGet]:
     """
-    Получает список всех типов предметов.
+    Retrieves a list of all item types.
 
-    :return: Список объектов ItemTypeGet с информацией о всех типах предметов.
-    :raises ObjectNotFound: Если типы предметов не найдены.
+    Returns a list of all item types.
+
+    Raises **ObjectNotFound** if no item types are found.
     """
     item_types_all: list[ItemType] = ItemType.query(session=db.session).all()
     if not item_types_all:
@@ -55,10 +58,13 @@ async def create_item_type(
     user=Depends(UnionAuth(scopes=["rental.item_type.create"], allow_none=False)),
 ) -> ItemTypeGet:
     """
-    Создает новый тип предмета.
+    Creates a new item type.
 
-    :param item_type_info: Данные для создания нового типа предмета.
-    :return: Объект ItemTypeGet с информацией о созданном типе предмета.
+    Scopes: `["rental.item_type.create"]`
+
+    - **item_type_info**: The data for the new item type.
+
+    Returns the created item type.
     """
     new_item_type = ItemType.create(session=db.session, **item_type_info.model_dump())
     ActionLogger.log_event(
@@ -76,15 +82,19 @@ async def update_item_type(
     id: int, item_type_info: ItemTypePost, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
 ) -> ItemTypeGet:
     """
-    Обновляет информацию о типе предмета по его идентификатору.
+    Updates the information of an item type by its ID.
 
-    :param id: Идентификатор типа предмета.
-    :param item_type_info: Данные для обновления типа предмета.
-    :return: Объект ItemTypeGet с обновленной информацией о типе предмета.
-    :raises ObjectNotFound: Если тип предмета с указанным идентификатором не найден.
+    Scopes: `["rental.item_type.update"]`
+
+    - **id**: The ID of the item type.
+    - **item_type_info**: The data to update the item type with.
+
+    Returns the updated item type.
+
+    Raises **ObjectNotFound** if the item type with the specified ID is not found.
     """
-    ItemType.get(id, session=db.session)
-    if item_type is None:
+    item_type_to_update = ItemType.get(id, session=db.session)
+    if item_type_to_update is None:
         raise ObjectNotFound(ItemType, id)
     updated_item = ItemType.update(id, session=db.session, **item_type_info.model_dump())
     ActionLogger.log_event(
@@ -102,21 +112,19 @@ async def delete_item_type(
     id: int, user=Depends(UnionAuth(scopes=["rental.item_type.delete"], allow_none=False))
 ) -> StatusResponseModel:
     """
-    Удаляет тип предмета по его id и все предметы этого типа.
+    Deletes an item type by its ID.
 
-    :param id: Идентификатор типа предмета.
-    :param user: Пользователь, авторизованный для выполнения действия.
-    :return: Объект StatusResponseModel с результатом выполнения операции.
-    :raises ObjectNotFound: Если тип предмета с указанным идентификатором не найден.
+    Scopes: `["rental.item_type.delete"]`
+
+    - **id**: The ID of the item type.
+
+    Returns a status response.
+
+    Raises **ObjectNotFound** if the item type with the specified ID is not found.
     """
-    item_type = ItemType.get(id, session=db.session)
-    if item_type is None:
+    item_type_to_delete = ItemType.get(id, session=db.session)
+    if item_type_to_delete is None:
         raise ObjectNotFound(ItemType, id)
-
-    items = Item.query(session=db.session).filter(Item.type_id == id).all()
-    for item in items:
-        Item.delete(item.id, session=db.session)
-
     ItemType.delete(id, session=db.session)
     ActionLogger.log_event(
         user_id=None,
@@ -126,7 +134,5 @@ async def delete_item_type(
         details={"id": id},
     )
     return StatusResponseModel(
-        status="success",
-        message="ItemType и связанные Items успешно удалены",
-        ru="Тип предмета и связанные предметы успешно удалены",
+        status="success", message="ItemType deleted successfully", ru="Тип предмета успешно удален"
     )
