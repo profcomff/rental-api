@@ -18,6 +18,16 @@ async def get_events(
     session_id: Optional[int] = Query(None),
     user=Depends(UnionAuth(scopes=["rental.event.view"], auto_error=False)),
 ) -> list[EventGet]:
+    """
+    Retrieves a list of events, with optional filtering.
+
+    Scopes: `["rental.event.view"]`
+
+    - **admin_id**: Filter events by admin ID.
+    - **session_id**: Filter events by session ID.
+
+    Returns a list of events.
+    """
     query = db.session.query(Event)
     if user_id is not None:
         query = query.filter(Event.user_id == user_id)

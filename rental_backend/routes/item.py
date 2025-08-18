@@ -18,10 +18,11 @@ item = APIRouter(prefix="/item", tags=["Items"])
 @item.get("", response_model=list[ItemGet])
 async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
     """
-    Получает список предметов. Если указан type_id, возвращает только предметы с этим типом.
+    Retrieves a list of items. If `type_id` is specified, only items of that type are returned.
 
-    :param type_id: Идентификатор типа предмета (опционально).
-    :return: Список объектов ItemGet с информацией о предметах.
+    - **type_id**: The ID of the item type (optional).
+
+    Returns a list of items.
     """
     query = Item.query(session=db.session)
     if type_id is not None:
@@ -33,11 +34,15 @@ async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> li
 @item.post("", response_model=ItemGet)
 async def create_item(item: ItemPost, user=Depends(UnionAuth(scopes=["rental.item.create"]))) -> ItemGet:
     """
-    Создает новый предмет.
+    Creates a new item.
 
-    :param item: Данные для создания нового предмета.
-    :return: Объект ItemGet с информацией о созданном предмете.
-    :raises ObjectNotFound: Если тип предмета с указанным type_id не найден.
+    Scopes: `["rental.item.create"]`
+
+    - **item**: The data for the new item.
+
+    Returns the created item.
+
+    Raises **ObjectNotFound** if the item type with the specified `type_id` is not found.
     """
     item_type = ItemType.get(item.type_id, session=db.session)
     if item_type is None:
@@ -56,16 +61,20 @@ async def create_item(item: ItemPost, user=Depends(UnionAuth(scopes=["rental.ite
 @item.patch("/{id}", response_model=ItemGet)
 async def update_item(
     id: int,
-    is_available: bool = Query(False, description="Флаг доступен ли предмет"),
+    is_available: bool = Query(False, description="Flag indicating if the item is available"),
     user=Depends(UnionAuth(scopes=["rental.item.patch"])),
 ) -> ItemGet:
     """
-    Обновляет статус доступности предмета по его идентификатору.
+    Updates the availability status of an item by its ID.
 
-    :param id: id предмета.
-    :param is_available: Флаг, указывающий? какой статус поставить предмету.
-    :return: Объект ItemGet с обновленной информацией о предмете.
-    :raises ObjectNotFound: Если предмет с указанным id не найден.
+    Scopes: `["rental.item.patch"]`
+
+    - **id**: The ID of the item.
+    - **is_available**: The new availability status for the item.
+
+    Returns the updated item.
+
+    Raises **ObjectNotFound** if the item with the specified ID is not found.
     """
     item = Item.query(session=db.session).filter(Item.id == id).one_or_none()
     if item is not None:
@@ -86,11 +95,15 @@ async def delete_item(
     id: int, user=Depends(UnionAuth(scopes=["rental.item.delete"], allow_none=False))
 ) -> StatusResponseModel:
     """
-    Удаляет предмет по его id.
+    Deletes an item by its ID.
 
-    :param id: id предмета.
-    :return: Объект StatusResponseModel с результатом выполнения операции.
-    :raises ObjectNotFound: Если предмет с указанным идентификатором не найден.
+    Scopes: `["rental.item.delete"]`
+
+    - **id**: The ID of the item.
+
+    Returns a status response.
+
+    Raises **ObjectNotFound** if the item with the specified ID is not found.
     """
     item = Item.get(id, session=db.session)
     if item is None:
