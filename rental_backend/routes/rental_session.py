@@ -159,6 +159,8 @@ async def accept_end_rental_session(
         details={"status": RentStatus.RETURNED},
     )
 
+    strike_id = None
+
     if with_strike:
         strike_info = StrikePost(
             user_id=ended_session.user_id, admin_id=user.get("id"), reason=strike_reason, session_id=rent_session.id
@@ -166,6 +168,9 @@ async def accept_end_rental_session(
         new_strike = Strike.create(
             session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
         )
+
+        ended_session.strike_id = new_strike.id
+        db.session.commit()
 
         ActionLogger.log_event(
             user_id=strike_info.user_id,
@@ -175,29 +180,9 @@ async def accept_end_rental_session(
             details=strike_info.model_dump(),
         )
 
+        strike_id = new_strike.id
+
     return RentalSessionGet.model_validate(ended_session)
-
-
-@rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
-async def get_user_sessions(user_id, user=Depends(UnionAuth())):
-    """
-    Получает список сессий аренды для указанного пользователя.
-
-    :param user_id: id пользователя.
-    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
-    """
-
-    sessions = (
-        db.session.query(RentalSession)
-        .options(joinedload(RentalSession.strike))
-        .filter(RentalSession.user_id == user_id)
-        .all()
-    )
-
-    return [
-        RentalSessionGet(**session.to_dict(), strike_id=session.strike.id if session.strike else None)
-        for session in sessions
-    ]
 
 
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
@@ -223,7 +208,6 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
 
 @rental_session.get("", response_model=list[RentalSessionGet])
 async def get_rental_sessions(
-
     is_reserved: bool = Query(False, description="флаг, показывать заявки"),
     is_canceled: bool = Query(False, description="Флаг, показывать отмененные"),
     is_dismissed: bool = Query(False, description="Флаг, показывать отклоненные"),
@@ -256,13 +240,13 @@ async def get_rental_sessions(
         to_show.append(RentStatus.RETURNED)
     if is_active:
         to_show.append(RentStatus.ACTIVE)
-        
+
     results = (
-    db.session.query(RentalSession, Strike.id.label("strike_id"))
-    .outerjoin(Strike, RentalSession.id == Strike.session_id)
-    .filter(RentalSession.user_id == user.get("id"))
-    .filter(RentalSession.status.in_(to_show) if to_show else RentalSession.user_id == user.get("id"))
-    .all()
+        db.session.query(RentalSession, Strike.id.label("strike_id"))
+        .outerjoin(Strike, RentalSession.id == Strike.session_id)
+        .filter(RentalSession.user_id == user.get("id"))
+        .filter(RentalSession.status.in_(to_show) if to_show else RentalSession.user_id == user.get("id"))
+        .all()
     )
 
     response = []
@@ -273,21 +257,20 @@ async def get_rental_sessions(
 
     return response
 
-  
+
 @rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
 async def get_user_sessions(user_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
-    Retrieves a list of rental sessions for the specified user with strike information.
+    Retrieves a list of rental sessions for the specified user.
+
+    Scopes: `["rental.session.admin"]`
+
+    - **user_id**: The ID of the user.
+
+    Returns a list of rental sessions.
     """
-    results = (
-        db.session.query(RentalSession, Strike.id.label("strike_id"))
-        .outerjoin(Strike, RentalSession.id == Strike.session_id)
-        .filter(RentalSession.user_id == user_id)
-        .all()
-    )
-    
-    return [RentalSessionGet.model_validate(session).copy(update={"strike_id": strike_id}) 
-            for session, strike_id in results]
+    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
+    return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
 
 
 @rental_session.get("", response_model=list[RentalSessionGet])
