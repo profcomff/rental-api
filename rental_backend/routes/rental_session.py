@@ -45,10 +45,6 @@ async def check_session_expiration(session_id: int):
 async def create_rental_session(item_type_id: int, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
     """
     Создает новую сессию аренды для указанного типа предмета.
-
-    :param item_type_id: Идентификатор типа предмета.
-    :param background_tasks: Фоновые задачи для выполнения.
-    :return: Объект RentalSessionGet с информацией о созданной сессии аренды.
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
     :raises SessionExists: Если у пользователя уже есть сессия с указанным типом предмета.
     """
