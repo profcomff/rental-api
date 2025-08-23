@@ -48,6 +48,9 @@ class RentalSession(BaseDbModel):
     end_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     actual_return_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     status: Mapped[RentStatus] = mapped_column(String, nullable=False)
+    strike = relationship("Strike", uselist=False, back_populates="session")
+
+    strike = relationship("Strike", uselist=False, back_populates="session")
     item: Mapped["Item"] = relationship("Item")
 
     @hybrid_property
@@ -76,3 +79,4 @@ class Strike(BaseDbModel):
     admin_id: Mapped[int] = mapped_column(Integer)
     reason: Mapped[str] = mapped_column(String)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime)
+    session = relationship("RentalSession", back_populates="strike")
