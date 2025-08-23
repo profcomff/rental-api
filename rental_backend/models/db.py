@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, select
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -17,6 +17,7 @@ class RentStatus(str, Enum):
     OVERDUE: str = "overdue"
     RETURNED: str = "returned"
     DISMISSED: str = "dismissed"
+    EXPIRED: str = "expired"
 
 
 class Item(BaseDbModel):
@@ -55,6 +56,10 @@ class RentalSession(BaseDbModel):
     @hybrid_property
     def item_type_id(self) -> int | None:
         return self.item.type_id if self.item else None
+
+    @item_type_id.expression
+    def item_type_id(cls):
+        return select(Item.type_id).where(Item.id == cls.item_id).scalar_subquery()
 
 
 class Event(BaseDbModel):
