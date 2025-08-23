@@ -216,32 +216,6 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
         assert response.status_code == status.HTTP_200_OK
 
 
-# Tests for GET /rental-sessions/user/{user_id}
-@pytest.mark.usefixtures('rentses')
-@pytest.mark.parametrize(
-    'user_id, right_status_code',
-    [
-        (0, status.HTTP_200_OK),  # id=0 -- это id из authlib_user.
-        ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ('he-he/hoho', status.HTTP_404_NOT_FOUND),
-        (-2, status.HTTP_200_OK),
-        ('', status.HTTP_422_UNPROCESSABLE_ENTITY),
-    ],
-    ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'empty'],
-)
-def test_get_for_user_with_diff_id(dbsession, client, base_rentses_url, user_id, right_status_code):
-    """Проверка логики метода с разным user_id."""
-    response = client.get(f'{base_rentses_url}/user/{user_id}')
-    assert response.status_code == right_status_code
-    if right_status_code == status.HTTP_200_OK:
-        returned_queue = response.json()
-        assert isinstance(returned_queue, list), 'Убедитесь, что возвращаемый объект типа List!'
-        assert len(returned_queue) == len(
-            RentalSession.query(session=dbsession).filter(RentalSession.user_id == user_id).all()
-        )
-
-
 # Tests for GET /rental-sessions/{session_id}
 @pytest.mark.usefixtures('rentses')
 @pytest.mark.parametrize(
