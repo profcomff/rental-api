@@ -4,7 +4,7 @@ import datetime
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import or_
+from sqlalchemy import or_, joinedload
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
@@ -184,52 +184,12 @@ async def accept_end_rental_session(
     return RentalSessionGet.model_validate(ended_session)
 
 
-@rental_session.get("/user/me", response_model=list[RentalSessionGet])
-async def get_my_sessions(
-    is_reserved: bool = Query(False, description="флаг, показывать заявки"),
-    is_canceled: bool = Query(False, description="Флаг, показывать отмененные"),
-    is_dismissed: bool = Query(False, description="Флаг, показывать отклоненные"),
-    is_overdue: bool = Query(False, description="Флаг, показывать просроченные"),
-    is_returned: bool = Query(False, description="Флаг, показывать вернутые"),
-    is_active: bool = Query(False, description="Флаг, показывать активные"),
-    user=Depends(UnionAuth()),
-):
-    """
-    Получает список сессий аренды с возможностью фильтрации по статусу.
-    :param is_reserved: Флаг, показывать зарезервированные сессии.
-    :param is_canceled: Флаг, показывать отмененные сессии.
-    :param is_dismissed: Флаг, показывать отклоненные сессии.
-    :param is_overdue: Флаг, показывать просроченные сессии.
-    :param is_returned: Флаг, показывать возвращенные сессии.
-    :param is_active: Флаг, показывать активные сессии.
-    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
-    """
-    to_show = []
-    if is_reserved:
-        to_show.append(RentStatus.RESERVED)
-    if is_canceled:
-        to_show.append(RentStatus.CANCELED)
-    if is_dismissed:
-        to_show.append(RentStatus.DISMISSED)
-    if is_overdue:
-        to_show.append(RentStatus.OVERDUE)
-    if is_returned:
-        to_show.append(RentStatus.RETURNED)
-    if is_active:
-        to_show.append(RentStatus.ACTIVE)
-    query = RentalSession.query(session=db.session).filter(RentalSession.user_id == user.get("id"))
-    if to_show:
-        query = query.filter(RentalSession.status.in_(to_show))
-    user_sessions = query.all()
-    return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
-
-
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
-async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
+async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
 
     result = (
-        db.session.query(RentalSession, Strike.id.label("strike_id"))
-        .outerjoin(Strike, RentalSession.id == Strike.session_id)
+        db.session.query(RentalSession)
+        .options(joinedload(RentalSession.strike))
         .filter(RentalSession.id == session_id)
         .first()
     )
@@ -237,35 +197,20 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth())):
     if not result:
         raise ObjectNotFound(RentalSession, session_id)
 
-    session, strike_id = result
-
-    session_data = RentalSessionGet.model_validate(session)
-    session_data.strike_id = strike_id
-
-    return session_data
+    result.strike_id = result.strike.id if result.strike else None
+    return RentalSessionGet.model_validate(result)
 
 
-@rental_session.get("", response_model=list[RentalSessionGet])
-async def get_rental_sessions(
-    is_reserved: bool = Query(False, description="флаг, показывать заявки"),
-    is_canceled: bool = Query(False, description="Флаг, показывать отмененные"),
-    is_dismissed: bool = Query(False, description="Флаг, показывать отклоненные"),
-    is_overdue: bool = Query(False, description="Флаг, показывать просроченные"),
-    is_returned: bool = Query(False, description="Флаг, показывать вернутые"),
-    is_active: bool = Query(False, description="Флаг, показывать активные"),
-    user=Depends(UnionAuth()),
+async def get_rental_sessions_common(
+    db_session,
+    is_reserved: bool = False,
+    is_canceled: bool = False,
+    is_dismissed: bool = False,
+    is_overdue: bool = False,
+    is_returned: bool = False,
+    is_active: bool = False,
+    user_id: int = 0,
 ):
-    """
-    Получает список сессий аренды с возможностью фильтрации по статусу.
-
-    :param is_reserved: Флаг, показывать зарезервированные сессии.
-    :param is_canceled: Флаг, показывать отмененные сессии.
-    :param is_dismissed: Флаг, показывать отклоненные сессии.
-    :param is_overdue: Флаг, показывать просроченные сессии.
-    :param is_returned: Флаг, показывать возвращенные сессии.
-    :param is_active: Флаг, показывать активные сессии.
-    :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
-    """
     to_show = []
     if is_reserved:
         to_show.append(RentStatus.RESERVED)
@@ -280,21 +225,11 @@ async def get_rental_sessions(
     if is_active:
         to_show.append(RentStatus.ACTIVE)
 
-    results = (
-        db.session.query(RentalSession, Strike.id.label("strike_id"))
-        .outerjoin(Strike, RentalSession.id == Strike.session_id)
-        .filter(RentalSession.user_id == user.get("id"))
-        .filter(RentalSession.status.in_(to_show) if to_show else RentalSession.user_id == user.get("id"))
-        .all()
-    )
+    if not to_show:  # if everything false by default should show all
+        to_show = list(RentStatus)
 
-    response = []
-    for session, strike_id in results:
-        session_data = RentalSessionGet.model_validate(session)
-        session_data.strike_id = strike_id
-        response.append(session_data)
-
-    return response
+    query = db_session.query(RentalSession).options(joinedload(RentalSession.strike))
+    query = query.filter(RentalSession.status.in_(to_show))
 
 
 @rental_session.get("/user/{user_id}", response_model=list[RentalSessionGet])
@@ -305,8 +240,14 @@ async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
     :param user_id: id пользователя.
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
-    user_sessions = RentalSession.query(session=db.session).filter(RentalSession.user_id == user_id).all()
-    return [RentalSessionGet.model_validate(user_session) for user_session in user_sessions]
+    
+    if user_id != 0:
+        query = query.filter(RentalSession.user_id == user_id)
+
+    rent_sessions = query.all()
+    for serssion in rent_sessions:
+        serssion.strike_id = serssion.strike.id if serssion.strike else None
+    return [RentalSessionGet.model_validate(session) for session in rent_sessions]
 
 
 @rental_session.get("", response_model=list[RentalSessionGet])
@@ -318,7 +259,7 @@ async def get_rental_sessions(
     is_returned: bool = Query(False, description="Флаг, показывать вернутые"),
     is_active: bool = Query(False, description="Флаг, показывать активные"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
-):
+)
     """
     Получает список сессий аренды с возможностью фильтрации по статусу.
 
@@ -330,22 +271,50 @@ async def get_rental_sessions(
     :param is_active: Флаг, показывать активные сессии.
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
-    to_show = []
-    if is_reserved:
-        to_show.append(RentStatus.RESERVED)
-    if is_canceled:
-        to_show.append(RentStatus.CANCELED)
-    if is_dismissed:
-        to_show.append(RentStatus.DISMISSED)
-    if is_overdue:
-        to_show.append(RentStatus.OVERDUE)
-    if is_returned:
-        to_show.append(RentStatus.RETURNED)
-    if is_active:
-        to_show.append(RentStatus.ACTIVE)
+  
+    return await get_rental_sessions_common(
+        db_session=db.session,
+        is_reserved=is_reserved,
+        is_canceled=is_canceled,
+        is_dismissed=is_dismissed,
+        is_overdue=is_overdue,
+        is_returned=is_returned,
+        is_active=is_active,
+        user_id=user_id,
+    )
 
-    rent_sessions = RentalSession.query(session=db.session).filter(RentalSession.status.in_(to_show)).all()
-    return [RentalSessionGet.model_validate(rent_session) for rent_session in rent_sessions]
+
+@rental_session.get("/user/me", response_model=list[RentalSessionGet])
+async def get_my_sessions(
+    is_reserved: bool = Query(False, description="флаг, показывать заявки"),
+    is_canceled: bool = Query(False, description="Флаг, показывать отмененные"),
+    is_dismissed: bool = Query(False, description="Флаг, показывать отклоненные"),
+    is_overdue: bool = Query(False, description="Флаг, показывать просроченные"),
+    is_returned: bool = Query(False, description="Флаг, показывать вернутые"),
+    is_active: bool = Query(False, description="Флаг, показывать активные"),
+    user=Depends(UnionAuth()),
+):
+    """
+    Retrieves a list of rental sessions for the user with optional status filtering.
+
+    - **is_reserved**: Filter by reserved sessions.
+    - **is_canceled**: Filter by canceled sessions.
+    - **is_dismissed**: Filter by dismissed sessions.
+    - **is_overdue**: Filter by overdue sessions.
+    - **is_returned**: Filter by returned sessions.
+    - **is_active**: Filter by active sessions.
+    Returns a list of rental sessions.
+    """
+    return await get_rental_sessions_common(
+        db_session=db.session,
+        is_reserved=is_reserved,
+        is_canceled=is_canceled,
+        is_dismissed=is_dismissed,
+        is_overdue=is_overdue,
+        is_returned=is_returned,
+        is_active=is_active,
+        user_id=user.get('id'),
+    )
 
 
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
