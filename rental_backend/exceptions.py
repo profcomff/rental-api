@@ -54,3 +54,11 @@ class InactiveSession(RentalApiError):
             f"Unable to end the session with id {obj_id_or_name} because it isn't active",
             f"Нельзя завершить сессию с id {obj_id_or_name}, потому то она не активна",
         )
+
+
+class SessionExists(RentalApiError):
+    def __init__(self, obj: type, obj_id_or_name: int | str):
+        super().__init__(
+            f"Session with an object of this type {obj_id_or_name} already exists",
+            f"Сессия с объектом данного типа {obj_id_or_name} уже существует",
+        )
