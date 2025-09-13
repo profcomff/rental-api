@@ -260,7 +260,7 @@ async def get_rental_sessions(
     is_returned: bool = Query(False, description="Флаг, показывать вернутые"),
     is_active: bool = Query(False, description="Флаг, показывать активные"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
-)
+):
     """
     Получает список сессий аренды с возможностью фильтрации по статусу.
 
