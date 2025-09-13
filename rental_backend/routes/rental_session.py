@@ -241,7 +241,7 @@ async def get_user_sessions(user_id: int, user=Depends(UnionAuth())):
     :param user_id: id пользователя.
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
-    
+
     if user_id != 0:
         query = query.filter(RentalSession.user_id == user_id)
 
@@ -272,7 +272,7 @@ async def get_rental_sessions(
     :param is_active: Флаг, показывать активные сессии.
     :return: Список объектов RentalSessionGet с информацией о сессиях аренды.
     """
-  
+
     return await get_rental_sessions_common(
         db_session=db.session,
         is_reserved=is_reserved,
