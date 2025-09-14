@@ -4,9 +4,10 @@ import datetime
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
-from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound
+from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
 from rental_backend.utils.action import ActionLogger
@@ -29,7 +30,7 @@ async def check_session_expiration(session_id: int):
         RentalSession.update(
             session=db.session,
             id=session_id,
-            status=RentStatus.CANCELED,
+            status=RentStatus.EXPIRED,
         )
         Item.update(session=db.session, id=session.item_id, is_available=True)
         ActionLogger.log_event(
@@ -37,35 +38,43 @@ async def check_session_expiration(session_id: int):
             admin_id=None,
             session_id=session.id,
             action_type="EXPIRE_SESSION",
-            details={"status": RentStatus.CANCELED},
+            details={"status": RentStatus.EXPIRED},
         )
 
 
 @rental_session.post("/{item_type_id}", response_model=RentalSessionGet)
 async def create_rental_session(item_type_id: int, background_tasks: BackgroundTasks, user=Depends(UnionAuth())):
     """
-    Creates a new rental session for the specified item type.
-
-    - **item_type_id**: The ID of the item type to rent.
-    - **background_tasks**: Background tasks to be executed.
-
-    Returns the created rental session.
-
-    Raises **NoneAvailable** if no items of the specified type are available.
+    Создает новую сессию аренды для указанного типа предмета.
+    :raises NoneAvailable: Если нет доступных предметов указанного типа.
+    :raises SessionExists: Если у пользователя уже есть сессия с указанным типом предмета.
     """
+    exist_session_item = (
+        RentalSession.query(session=db.session)
+        .filter(
+            RentalSession.user_id == user.get("id"),
+            RentalSession.item_type_id == item_type_id,
+            or_(RentalSession.status == RentStatus.RESERVED, RentalSession.status == RentStatus.ACTIVE),
+        )
+        .first()
+    )
+    if exist_session_item:
+        raise SessionExists(RentalSession, item_type_id)
+
     available_items = (
-        Item.query(session=db.session).filter(Item.type_id == item_type_id, Item.is_available == True).all()
+        Item.query(session=db.session).filter(Item.type_id == item_type_id, Item.is_available == True).first()
     )
     if not available_items:
         raise NoneAvailable(ItemType, item_type_id)
+
     session = RentalSession.create(
         session=db.session,
         user_id=user.get("id"),
-        item_id=available_items[0].id,
+        item_id=available_items.id,
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
     )
-    Item.update(session=db.session, id=available_items[0].id, is_available=False)
+    Item.update(session=db.session, id=available_items.id, is_available=False)
 
     background_tasks.add_task(check_session_expiration, session.id)
 

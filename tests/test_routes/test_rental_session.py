@@ -107,7 +107,7 @@ def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
     response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
     assert response.status_code == status.HTTP_200_OK
     assert (
-        RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.CANCELED
+        RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.EXPIRED
     ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.CANCELED!'
 
 
