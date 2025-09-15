@@ -160,6 +160,8 @@ async def accept_end_rental_session(
         admin_close_id=user.get("id"),
     )
 
+    Item.update(id=rent_session.item_id, session=db.session, is_available=True)
+
     ActionLogger.log_event(
         user_id=rent_session.user_id,
         admin_id=user.get("id"),
