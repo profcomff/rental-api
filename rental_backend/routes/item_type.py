@@ -3,9 +3,9 @@ from fastapi import APIRouter, Depends
 from fastapi_sqlalchemy import db
 
 from rental_backend.exceptions import ObjectNotFound
-from rental_backend.models.db import Item, ItemType
+from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
-from rental_backend.schemas.models import ItemTypeGet, ItemTypePost
+from rental_backend.schemas.models import ItemGet, ItemTypeGet, ItemTypePost
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
@@ -105,6 +105,43 @@ async def update_item_type(
         details=item_type_info.model_dump(),
     )
     return ItemTypeGet.model_validate(updated_item)
+
+
+@item_type.patch("/available/{id}", response_model=ItemGet)
+async def update_item_type(
+    id: int, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
+) -> ItemGet:
+    """
+    Makes one item available of an item_type by its ID.
+
+    Scopes: `["rental.item_type.update"]`
+
+    - **id**: The ID of the item type.
+
+    Returns the updated availability of item of an item_type.
+
+    Raises **ObjectNotFound** if the available item type with the specified ID is not found.
+    """
+    item = Item.query(session=db.session).filter(Item.type_id == id, Item.is_available == False).first()
+    if not item:
+        raise ObjectNotFound(ItemType, id)
+    session: RentalSession = (
+        RentalSession.query(session=db.session)
+        .filter(RentalSession.item_id == item.id, RentalSession.status != "active")
+        .one_or_none()
+    )
+    if session:
+        updated_item = Item.update(item.id, session=db.session, is_available=True)
+        ActionLogger.log_event(
+            user_id=None,
+            admin_id=user.get('id'),
+            session_id=None,
+            action_type="AVAILABLE_ITEM_TYPE",
+            details={"id": id},
+        )
+        return ItemGet.model_validate(updated_item)
+    if not session:
+        raise ForbiddenAction(ItemType)
 
 
 @item_type.delete("/{id}", response_model=StatusResponseModel)
