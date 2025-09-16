@@ -2,7 +2,7 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends
 from fastapi_sqlalchemy import db
 
-from rental_backend.exceptions import ForbiddenAction, NoneAvailable, ObjectNotFound
+from rental_backend.exceptions import NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemGet, ItemTypeGet, ItemTypePost, RentStatus
@@ -124,7 +124,7 @@ async def update_item_type(
     """
     items = Item.query(session=db.session).filter(Item.type_id == id, Item.is_available == False).all()
     if not items:
-        raise NoneAvailable(ItemType, id)
+        raise ObjectNotFound(ItemType, id)
     activate_item = None
     for item in items:
         unavailable: RentalSession = (
@@ -138,7 +138,7 @@ async def update_item_type(
             activate_item = item
             break
     if not activate_item:
-        raise ForbiddenAction(ItemType)
+        raise NoneAvailable(ItemType, id)
     updated_item = Item.update(activate_item.id, session=db.session, is_available=True)
     ActionLogger.log_event(
         user_id=None,
