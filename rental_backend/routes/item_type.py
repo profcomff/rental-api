@@ -2,7 +2,7 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends
 from fastapi_sqlalchemy import db
 
-from rental_backend.exceptions import ForbiddenAction, ObjectNotFound
+from rental_backend.exceptions import ForbiddenAction, NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemGet, ItemTypeGet, ItemTypePost, RentStatus
@@ -122,30 +122,32 @@ async def update_item_type(
 
     Raises **ObjectNotFound** if the available item type with the specified ID is not found.
     """
-    item = Item.query(session=db.session).filter(Item.type_id == id).all()
-    if not item:
-        raise ObjectNotFound(ItemType, id)
-    item = Item.query(session=db.session).filter(Item.type_id == id, Item.is_available == False).first()
-    if not item:
-        raise ForbiddenAction(ItemType)
-    session: RentalSession = (
-        RentalSession.query(session=db.session)
-        .filter(RentalSession.item_id == item.id, RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED]))
-        .one_or_none()
-    )
-    if session:
-        raise ForbiddenAction(ItemType)
-    if not session:
-        print(session)
-        updated_item = Item.update(item.id, session=db.session, is_available=True)
-        ActionLogger.log_event(
-            user_id=None,
-            admin_id=user.get('id'),
-            session_id=None,
-            action_type="AVAILABLE_ITEM_TYPE",
-            details={"id": item.id},
+    items = Item.query(session=db.session).filter(Item.type_id == id, Item.is_available == False).all()
+    if not items:
+        raise NoneAvailable(ItemType, id)
+    activate_item = None
+    for item in items:
+        unavailable: RentalSession = (
+            RentalSession.query(session=db.session)
+            .filter(
+                RentalSession.item_id == item.id, RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED])
+            )
+            .one_or_none()
         )
-        return ItemGet.model_validate(updated_item)
+        if not unavailable:
+            activate_item = item
+            break
+    if not activate_item:
+        raise ForbiddenAction(ItemType)
+    updated_item = Item.update(activate_item.id, session=db.session, is_available=True)
+    ActionLogger.log_event(
+        user_id=None,
+        admin_id=user.get('id'),
+        session_id=None,
+        action_type="AVAILABLE_ITEM_TYPE",
+        details={"id": activate_item.id},
+    )
+    return ItemGet.model_validate(updated_item)
 
 
 @item_type.delete("/{id}", response_model=StatusResponseModel)
