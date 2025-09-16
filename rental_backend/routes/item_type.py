@@ -1,6 +1,8 @@
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends
 from fastapi_sqlalchemy import db
+from sqlalchemy import and_
+from sqlalchemy.orm import load_only
 
 from rental_backend.exceptions import NoneAvailable, ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession
@@ -112,40 +114,41 @@ async def update_item_type(
     id: int, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
 ) -> ItemGet:
     """
-    Makes one item available of an item_type by its ID.
+    Делает один предмет доступным по ID типа предмета.
 
-    Scopes: `["rental.item_type.update"]`
+    Скоупы: `["rental.item_type.update"]`
 
-    - **id**: The ID of the item type.
+    - **id**: ID типа предмета.
 
-    Returns the updated availability of item of an item_type.
+    Возвращает обновленную доступность предмета заданного типа.
 
-    Raises **ObjectNotFound** if the available item type with the specified ID is not found.
+    Вызывает **ObjectNotFound**, если тип предмета с указанным ID не найден.
+
+    Вызывает **NoneAvailable**, если нет подходящих предметов для активации.
     """
-    items = Item.query(session=db.session).filter(Item.type_id == id, Item.is_available == False).all()
-    if not items:
-        raise ObjectNotFound(ItemType, id)
-    activate_item = None
-    for item in items:
-        unavailable: RentalSession = (
-            RentalSession.query(session=db.session)
-            .filter(
-                RentalSession.item_id == item.id, RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED])
-            )
-            .one_or_none()
+    item = (
+        db.session.query(Item)
+        .outerjoin(
+            RentalSession,
+            and_(RentalSession.item_id == Item.id, RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED])),
         )
-        if not unavailable:
-            activate_item = item
-            break
-    if not activate_item:
-        raise NoneAvailable(ItemType, id)
-    updated_item = Item.update(activate_item.id, session=db.session, is_available=True)
+        .filter(Item.type_id == id, Item.is_available == False, RentalSession.id.is_(None))
+        .options(load_only(Item.id))
+        .first()
+    )
+    if not item:
+        item_available = ItemType.query(session=db.session).filter(ItemType.id == id).first()
+        if not item_available:
+            raise ObjectNotFound(ItemType, id)
+        else:
+            raise NoneAvailable(ItemType, id)
+    updated_item = Item.update(item.id, session=db.session, is_available=True)
     ActionLogger.log_event(
         user_id=None,
         admin_id=user.get('id'),
         session_id=None,
         action_type="AVAILABLE_ITEM_TYPE",
-        details={"id": activate_item.id},
+        details={"id": item.id},
     )
     return ItemGet.model_validate(updated_item)
 
