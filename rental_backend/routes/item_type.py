@@ -137,11 +137,7 @@ async def update_item_type(
         .first()
     )
     if not item:
-        item_available = ItemType.query(session=db.session).filter(ItemType.id == id).first()
-        if not item_available:
-            raise ObjectNotFound(ItemType, id)
-        else:
-            raise NoneAvailable(ItemType, id)
+        raise ObjectNotFound(ItemType, id)
     updated_item = Item.update(item.id, session=db.session, is_available=True)
     ActionLogger.log_event(
         user_id=None,
