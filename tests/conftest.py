@@ -262,6 +262,34 @@ def items_with_types(dbsession):
     dbsession.commit()
 
 
+@pytest.fixture()
+def items_with_same_type_id(dbsession):
+    """Фикстура Item.
+
+    .. note::
+        Фикстура создает три item одного item_type: последний с флагом is_available=False
+    """
+    item_types = [ItemType(name="testingtype1"), ItemType(name="testingtype2")]
+    for item_type in item_types:
+        dbsession.add(item_type)
+    dbsession.commit()
+
+    items = [
+        Item(type_id=item_types[0].id, is_available=True),
+        Item(type_id=item_types[0].id, is_available=False),
+    ]
+    for i in items:
+        dbsession.add(i)
+    dbsession.commit()
+    yield item_types
+    for i in item_types:
+        for item in i.items:
+            dbsession.delete(item)
+        dbsession.flush()
+        dbsession.delete(i)
+    dbsession.commit()
+
+
 @pytest.fixture
 def items_with_same_type(dbsession, item_types) -> List[Item]:
     """Создает 2 Item с одним itemType в БД и возвращает их."""

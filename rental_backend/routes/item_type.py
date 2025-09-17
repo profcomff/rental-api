@@ -4,7 +4,7 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 from sqlalchemy.orm import load_only
 
-from rental_backend.exceptions import NoneAvailable, ObjectNotFound
+from rental_backend.exceptions import ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemGet, ItemTypeGet, ItemTypePost, RentStatus
@@ -123,8 +123,6 @@ async def update_item_type(
     Возвращает обновленную доступность предмета заданного типа.
 
     Вызывает **ObjectNotFound**, если тип предмета с указанным ID не найден.
-
-    Вызывает **NoneAvailable**, если нет подходящих предметов для активации.
     """
     item = (
         db.session.query(Item)
