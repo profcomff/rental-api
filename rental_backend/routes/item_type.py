@@ -1,11 +1,13 @@
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends
 from fastapi_sqlalchemy import db
+from sqlalchemy import and_
+from sqlalchemy.orm import load_only
 
 from rental_backend.exceptions import ObjectNotFound
-from rental_backend.models.db import Item, ItemType
+from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
-from rental_backend.schemas.models import ItemTypeGet, ItemTypePost
+from rental_backend.schemas.models import ItemGet, ItemTypeGet, ItemTypePost, RentStatus
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
@@ -105,6 +107,44 @@ async def update_item_type(
         details=item_type_info.model_dump(),
     )
     return ItemTypeGet.model_validate(updated_item)
+
+
+@item_type.patch("/available/{id}", response_model=ItemGet)
+async def update_item_type(
+    id: int, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
+) -> ItemGet:
+    """
+    Делает один предмет доступным по ID типа предмета.
+
+    Скоупы: `["rental.item_type.update"]`
+
+    - **id**: ID типа предмета.
+
+    Возвращает обновленную доступность предмета заданного типа.
+
+    Вызывает **ObjectNotFound**, если тип предмета с указанным ID не найден.
+    """
+    item = (
+        db.session.query(Item)
+        .outerjoin(
+            RentalSession,
+            and_(RentalSession.item_id == Item.id, RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED])),
+        )
+        .filter(Item.type_id == id, Item.is_available == False, RentalSession.id.is_(None))
+        .options(load_only(Item.id))
+        .first()
+    )
+    if not item:
+        raise ObjectNotFound(ItemType, id)
+    updated_item = Item.update(item.id, session=db.session, is_available=True)
+    ActionLogger.log_event(
+        user_id=None,
+        admin_id=user.get('id'),
+        session_id=None,
+        action_type="AVAILABLE_ITEM_TYPE",
+        details={"id": item.id},
+    )
+    return ItemGet.model_validate(updated_item)
 
 
 @item_type.delete("/{id}", response_model=StatusResponseModel)
