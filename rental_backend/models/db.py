@@ -3,9 +3,9 @@ from __future__ import annotations
 import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, select
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, select
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
 
 from .base import BaseDbModel
 
@@ -33,6 +33,23 @@ class ItemType(BaseDbModel):
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     items: Mapped[list[Item]] = relationship("Item", back_populates="type")
+
+    @classmethod
+    def get_availability(cls, session, item_type_id: int, user_id: int) -> bool:
+        result = (
+            session.query(Item)
+            .outerjoin(
+                RentalSession,
+                and_(
+                    RentalSession.item_id == Item.id,
+                    RentalSession.user_id == user_id,
+                    RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED]),
+                ),
+            )
+            .filter(Item.type_id == item_type_id, Item.is_available == False, ~RentalSession.id.is_(None))
+            .one_or_none()
+        )
+        return result is None
 
 
 class RentalSession(BaseDbModel):

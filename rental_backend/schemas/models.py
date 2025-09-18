@@ -11,6 +11,7 @@ class ItemTypeGet(Base):
     image_url: str | None = None
     description: str | None = None
     free_items_count: int | None = None
+    availability: bool | None = None
 
 
 class ItemTypePost(Base):
@@ -22,6 +23,7 @@ class ItemTypePost(Base):
 class ItemTypeAvailable(Base):
     item_ids: list[int]
     items_changed: int
+    total_available: int
 
 
 class ItemGet(Base):
