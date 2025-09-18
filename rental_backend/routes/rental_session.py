@@ -221,6 +221,7 @@ async def get_rental_sessions_common(
     is_overdue: bool = False,
     is_returned: bool = False,
     is_active: bool = False,
+    item_type_id: int = 0,
     user_id: int = 0,
 ):
     to_show = []
@@ -245,7 +246,8 @@ async def get_rental_sessions_common(
 
     if user_id != 0:
         query = query.filter(RentalSession.user_id == user_id)
-
+    if item_type_id != 0:
+        query = query.filter(RentalSession.item_type_id == item_type_id)
     rent_sessions = query.all()
     for serssion in rent_sessions:
         serssion.strike_id = serssion.strike.id if serssion.strike else None
@@ -260,6 +262,7 @@ async def get_rental_sessions(
     is_overdue: bool = Query(False, description="Filter by overdue sessions."),
     is_returned: bool = Query(False, description="Filter by returned sessions."),
     is_active: bool = Query(False, description="Filter by active sessions."),
+    item_type_id: int = Query(0, description="Item_type_id to get sessions"),
     user_id: int = Query(0, description="User_id to get sessions"),
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
@@ -285,6 +288,7 @@ async def get_rental_sessions(
         is_overdue=is_overdue,
         is_returned=is_returned,
         is_active=is_active,
+        item_type_id=item_type_id,
         user_id=user_id,
     )
 
@@ -297,6 +301,7 @@ async def get_my_sessions(
     is_overdue: bool = Query(False, description="Флаг, показывать просроченные"),
     is_returned: bool = Query(False, description="Флаг, показывать вернутые"),
     is_active: bool = Query(False, description="Флаг, показывать активные"),
+    item_type_id: int = Query(0, description="ID типа предмета"),
     user=Depends(UnionAuth()),
 ):
     """
@@ -318,6 +323,7 @@ async def get_my_sessions(
         is_overdue=is_overdue,
         is_returned=is_returned,
         is_active=is_active,
+        item_type_id=item_type_id,
         user_id=user.get('id'),
     )
 
