@@ -7,7 +7,7 @@ from sqlalchemy.orm import load_only
 from rental_backend.exceptions import ObjectNotFound
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
-from rental_backend.schemas.models import ItemGet, ItemTypeGet, ItemTypePost, RentStatus
+from rental_backend.schemas.models import ItemGet, ItemTypeAvailable, ItemTypeGet, ItemTypePost, RentStatus
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
@@ -109,10 +109,10 @@ async def update_item_type(
     return ItemTypeGet.model_validate(updated_item)
 
 
-@item_type.patch("/available/{id}", response_model=ItemGet)
-async def update_item_type(
-    id: int, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
-) -> ItemGet:
+@item_type.patch("/available/{id}", response_model=ItemTypeAvailable)
+async def make_item_type_available(
+    id: int, count, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
+) -> ItemTypeAvailable:
     """
     Делает один предмет доступным по ID типа предмета.
 
@@ -124,7 +124,7 @@ async def update_item_type(
 
     Вызывает **ObjectNotFound**, если тип предмета с указанным ID не найден.
     """
-    item = (
+    items = (
         db.session.query(Item)
         .outerjoin(
             RentalSession,
@@ -132,19 +132,23 @@ async def update_item_type(
         )
         .filter(Item.type_id == id, Item.is_available == False, RentalSession.id.is_(None))
         .options(load_only(Item.id))
-        .first()
+        .all()
     )
-    if not item:
+    result = {"item_ids": [], "items_changed": 0}
+    if len(items) == 0:
         raise ObjectNotFound(ItemType, id)
-    updated_item = Item.update(item.id, session=db.session, is_available=True)
-    ActionLogger.log_event(
-        user_id=None,
-        admin_id=user.get('id'),
-        session_id=None,
-        action_type="AVAILABLE_ITEM_TYPE",
-        details={"id": item.id},
-    )
-    return ItemGet.model_validate(updated_item)
+    for i in range(min(len(items), count)):
+        updated_item = Item.update(items[i].id, session=db.session, is_available=True)
+        result["item_ids"].append(items[i].id)
+        result["items_changed"] += 1
+        ActionLogger.log_event(
+            user_id=None,
+            admin_id=user.get('id'),
+            session_id=None,
+            action_type="AVAILABLE_ITEM_TYPE",
+            details={"id": items[i].id},
+        )
+    return ItemTypeAvailable.model_validate(result)
 
 
 @item_type.delete("/{id}", response_model=StatusResponseModel)

@@ -345,6 +345,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
         session=db.session,
         id=session_id,
         status=RentStatus.CANCELED,
+        end_ts=datetime.datetime.now(tz=datetime.timezone.utc),
     )
     Item.update(session=db.session, id=session.item_id, is_available=True)
 

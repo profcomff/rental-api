@@ -19,6 +19,11 @@ class ItemTypePost(Base):
     description: str | None = None
 
 
+class ItemTypeAvailable(Base):
+    item_ids: list[int]
+    items_changed: int
+
+
 class ItemGet(Base):
     id: int
     type_id: int
