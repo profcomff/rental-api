@@ -9,6 +9,7 @@ from rental_backend.exceptions import (
     NoneAvailable,
     ObjectNotFound,
     SessionExists,
+    ValueError,
 )
 from rental_backend.schemas.base import StatusResponseModel
 
@@ -61,4 +62,11 @@ async def inactive_session_error_handler(req: starlette.requests.Request, exc: I
 async def session_exists_error_handler(req: starlette.requests.Request, exc: SessionExists):
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=409
+    )
+
+
+@app.exception_handler(ValueError)
+async def value_error_handler(req: starlette.requests.Request, exc: ValueError):
+    return JSONResponse(
+        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=422
     )

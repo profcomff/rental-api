@@ -19,6 +19,11 @@ class ObjectNotFound(RentalApiError):
         )
 
 
+class ValueError(RentalApiError):
+    def __init__(self, value: str):
+        super().__init__(f"Value {value} is not valid", f"Значение {value} недопустимо")
+
+
 class AlreadyExists(RentalApiError):
     def __init__(self, obj: type, obj_id_or_name: int | str):
         super().__init__(
