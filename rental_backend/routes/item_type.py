@@ -7,7 +7,7 @@ from sqlalchemy.orm import load_only
 from rental_backend.exceptions import ObjectNotFound, ValueError
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
-from rental_backend.schemas.models import ItemGet, ItemTypeAvailable, ItemTypeGet, ItemTypePost, RentStatus
+from rental_backend.schemas.models import ItemTypeAvailable, ItemTypeGet, ItemTypePost, RentStatus
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 

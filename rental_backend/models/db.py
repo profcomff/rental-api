@@ -5,7 +5,7 @@ from enum import Enum
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, select
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseDbModel
 
