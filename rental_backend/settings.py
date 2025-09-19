@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     ROOT_PATH: str = "/" + os.getenv("APP_NAME", "")
 
     SERVICE_ID: int = os.getenv("SERVICE_ID", -4)  # Указать id сервиса по умолчанию
+    RENTAL_SESSION_EXPIRY_IN_MINUTES: int = 10
+    RENTAL_SESSION_OVERDUE_IN_HOURS: int = 48  # Указать реальное значение
 
     CORS_ALLOW_ORIGINS: list[str] = ["*"]
     CORS_ALLOW_CREDENTIALS: bool = True
