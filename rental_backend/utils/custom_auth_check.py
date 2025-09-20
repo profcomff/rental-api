@@ -23,4 +23,5 @@ class UnionAuthChecker(UnionAuth):
             or phone_number_info[0]["Номер телефона"] == ""
         ):
             self._except_not_authorized()
+        result["user_phone"] = phone_number_info[0]["Номер телефона"]
         return result
