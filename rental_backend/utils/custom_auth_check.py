@@ -17,6 +17,10 @@ class UnionAuthChecker(UnionAuth):
             phone_number_info = list(filter(lambda x: "phone_number" in x, user_data_info["items"]))
         else:
             self._except_not_authorized()
-        if len(union_member_info) == 0 or union_member_info[0]["is_union_member"] is False or phone_number_info[0]["phone_number"] == "":
+        if (
+            len(union_member_info) == 0
+            or union_member_info[0]["is_union_member"] is False
+            or phone_number_info[0]["phone_number"] == ""
+        ):
             self._except_not_authorized()
         return result
