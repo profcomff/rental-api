@@ -73,7 +73,6 @@ class RentalSessionPost(Base):
 class RentalSessionGet(Base):
     id: int
     user_id: int
-    phone_number: str
     item_id: int
     item_type_id: int
     admin_open_id: int | None
