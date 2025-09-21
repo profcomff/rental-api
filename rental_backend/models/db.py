@@ -5,7 +5,7 @@ from enum import Enum
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, select
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import BaseDbModel
 
@@ -65,6 +65,7 @@ class RentalSession(BaseDbModel):
     end_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     actual_return_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True)
     status: Mapped[RentStatus] = mapped_column(String, nullable=False)
+    user_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     strike = relationship("Strike", uselist=False, back_populates="session")
 
     strike = relationship("Strike", uselist=False, back_populates="session")
