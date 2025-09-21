@@ -1,6 +1,7 @@
 import asyncio
 import datetime
 
+from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
 from sqlalchemy import or_
@@ -91,7 +92,7 @@ async def create_rental_session(item_type_id: int, background_tasks: BackgroundT
 
 
 @rental_session.patch("/{session_id}/start", response_model=RentalSessionGet)
-async def start_rental_session(session_id: int, user=Depends(UnionAuthChecker(scopes=["rental.session.admin"]))):
+async def start_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
     Starts a rental session, changing its status to ACTIVE.
 
@@ -130,7 +131,7 @@ async def accept_end_rental_session(
     session_id: int,
     with_strike: bool = Query(False, description="A flag indicating whether to issue a strike."),
     strike_reason: str = Query("", description="The reason for the strike."),
-    user=Depends(UnionAuthChecker(scopes=["rental.session.admin"])),
+    user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
     """
     Ends a rental session, changing its status to RETURNED. Issues a strike if specified.
@@ -198,7 +199,7 @@ async def accept_end_rental_session(
 
 
 @rental_session.get("/{session_id}", response_model=RentalSessionGet)
-async def get_rental_session(session_id: int, user=Depends(UnionAuthChecker(scopes=["rental.session.admin"]))):
+async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
 
     result = (
         db.session.query(RentalSession)
@@ -265,7 +266,7 @@ async def get_rental_sessions(
     is_active: bool = Query(False, description="Filter by active sessions."),
     item_type_id: int = Query(0, description="Item_type_id to get sessions"),
     user_id: int = Query(0, description="User_id to get sessions"),
-    user=Depends(UnionAuthChecker(scopes=["rental.session.admin"])),
+    user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
     """
     Retrieves a list of rental sessions with optional status filtering.
@@ -369,7 +370,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuthChecker()
 
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
-    session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuthChecker(scopes=["rental.session.admin"]))
+    session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
     """
     Updates the information of a rental session.
