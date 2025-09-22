@@ -4,7 +4,7 @@ import datetime
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import or_
+from sqlalchemy import case, or_
 from sqlalchemy.orm import joinedload
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
@@ -227,24 +227,33 @@ async def get_rental_sessions_common(
     user_id: int = 0,
 ):
     to_show = []
-    if is_reserved:
-        to_show.append(RentStatus.RESERVED)
-    if is_canceled:
-        to_show.append(RentStatus.CANCELED)
-    if is_dismissed:
-        to_show.append(RentStatus.DISMISSED)
     if is_overdue:
         to_show.append(RentStatus.OVERDUE)
-    if is_returned:
-        to_show.append(RentStatus.RETURNED)
     if is_active:
         to_show.append(RentStatus.ACTIVE)
+    if is_dismissed:
+        to_show.append(RentStatus.DISMISSED)
+    if is_canceled:
+        to_show.append(RentStatus.CANCELED)
+    if is_returned:
+        to_show.append(RentStatus.RETURNED)
+    if is_reserved:
+        to_show.append(RentStatus.RESERVED)
 
     if not to_show:  # if everything false by default should show all
-        to_show = list(RentStatus)
+        to_show = to_show = [
+            RentStatus.OVERDUE,
+            RentStatus.ACTIVE,
+            RentStatus.DISMISSED,
+            RentStatus.CANCELED,
+            RentStatus.RETURNED,
+            RentStatus.RESERVED,
+        ]
 
     query = db_session.query(RentalSession).options(joinedload(RentalSession.strike))
     query = query.filter(RentalSession.status.in_(to_show))
+    status_order = case({status: i for i, status in enumerate(to_show)}, value=RentalSession.status)
+    query = query.order_by(status_order)
 
     if user_id != 0:
         query = query.filter(RentalSession.user_id == user_id)
