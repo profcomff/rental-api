@@ -11,7 +11,6 @@ from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
-from rental_backend.utils.custom_auth_check import UnionAuthChecker
 
 
 settings: Settings = get_settings()

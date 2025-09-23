@@ -52,6 +52,10 @@ async def get_items_types() -> list[ItemTypeGet]:
         item_type.free_items_count = (
             Item.query(session=db.session).filter(Item.type_id == item_type.id, Item.is_available == True).count()
         )
+        if item_type.free_items_count != 0:
+            item_type.availability = True
+        else:
+            item_type.availability = False
     return [ItemTypeGet.model_validate(item_type) for item_type in item_types_all]
 
 

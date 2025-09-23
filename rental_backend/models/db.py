@@ -36,6 +36,9 @@ class ItemType(BaseDbModel):
 
     @classmethod
     def get_availability(cls, session, item_type_id: int, user_id: int) -> bool:
+        all_items = session.query(Item).filter(Item.type_id == item_type_id).count()
+        if all_items == 0:
+            return False
         result = (
             session.query(Item)
             .outerjoin(
