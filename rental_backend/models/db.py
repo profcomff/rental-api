@@ -36,6 +36,9 @@ class ItemType(BaseDbModel):
 
     @classmethod
     def get_availability(cls, session, item_type_id: int, user_id: int) -> bool:
+        all_items = session.query(Item).filter(Item.type_id == item_type_id).count()
+        if all_items == 0:
+            return False
         result = (
             session.query(Item)
             .outerjoin(
@@ -43,22 +46,6 @@ class ItemType(BaseDbModel):
                 and_(
                     RentalSession.item_id == Item.id,
                     RentalSession.user_id == user_id,
-                    RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED]),
-                ),
-            )
-            .filter(Item.type_id == item_type_id, Item.is_available == False, ~RentalSession.id.is_(None))
-            .one_or_none()
-        )
-        return result is None
-
-    @classmethod
-    def get_availability_without_user(cls, session, item_type_id: int) -> bool:
-        result = (
-            session.query(Item)
-            .outerjoin(
-                RentalSession,
-                and_(
-                    RentalSession.item_id == Item.id,
                     RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED]),
                 ),
             )
