@@ -365,7 +365,7 @@ async def get_my_sessions(
     is_active: bool = Query(False, description="Флаг, показывать активные"),
     is_expired: bool = Query(False, description="Флаг, показывать просроченные"),
     item_type_id: int = Query(0, description="ID типа предмета"),
-    user=Depends(UnionAuthChecker()),
+    user=Depends(UnionAuth()),
 ):
     """
     Retrieves a list of rental sessions for the user with optional status filtering.
