@@ -51,6 +51,22 @@ class ItemType(BaseDbModel):
         )
         return result is None
 
+    @classmethod
+    def get_availability_without_user(cls, session, item_type_id: int) -> bool:
+        result = (
+            session.query(Item)
+            .outerjoin(
+                RentalSession,
+                and_(
+                    RentalSession.item_id == Item.id,
+                    RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED]),
+                ),
+            )
+            .filter(Item.type_id == item_type_id, Item.is_available == False, ~RentalSession.id.is_(None))
+            .one_or_none()
+        )
+        return result is None
+
 
 class RentalSession(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
