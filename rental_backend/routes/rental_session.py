@@ -3,7 +3,7 @@ import datetime
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import or_
+from sqlalchemy import case, or_
 from sqlalchemy.orm import joinedload
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
@@ -11,6 +11,7 @@ from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
+from rental_backend.utils.custom_auth_check import UnionAuthChecker
 
 
 settings: Settings = get_settings()
@@ -106,6 +107,7 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
         item_id=available_item.id,
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
+        user_phone=user.get("user_phone"),
     )
     available_item.is_available = False
 
@@ -262,26 +264,36 @@ async def get_rental_sessions_common(
     user_id: int = 0,
 ):
     to_show = []
-    if is_reserved:
-        to_show.append(RentStatus.RESERVED)
-    if is_canceled:
-        to_show.append(RentStatus.CANCELED)
-    if is_dismissed:
-        to_show.append(RentStatus.DISMISSED)
     if is_overdue:
         to_show.append(RentStatus.OVERDUE)
-    if is_returned:
-        to_show.append(RentStatus.RETURNED)
     if is_active:
         to_show.append(RentStatus.ACTIVE)
     if is_expired:
         to_show.append(RentStatus.EXPIRED)
+    if is_dismissed:
+        to_show.append(RentStatus.DISMISSED)
+    if is_canceled:
+        to_show.append(RentStatus.CANCELED)
+    if is_returned:
+        to_show.append(RentStatus.RETURNED)
+    if is_reserved:
+        to_show.append(RentStatus.RESERVED)
 
     if not to_show:  # if everything false by default should show all
-        to_show = list(RentStatus)
+        to_show = to_show = [
+            RentStatus.OVERDUE,
+            RentStatus.ACTIVE,
+            RentStatus.DISMISSED,
+            RentStatus.CANCELED,
+            RentStatus.EXPIRED,
+            RentStatus.RETURNED,
+            RentStatus.RESERVED,
+        ]
 
     query = db_session.query(RentalSession).options(joinedload(RentalSession.strike))
     query = query.filter(RentalSession.status.in_(to_show))
+    status_order = case({status: i for i, status in enumerate(to_show)}, value=RentalSession.status)
+    query = query.order_by(status_order)
 
     if user_id != 0:
         query = query.filter(RentalSession.user_id == user_id)
@@ -353,7 +365,7 @@ async def get_my_sessions(
     is_active: bool = Query(False, description="Флаг, показывать активные"),
     is_expired: bool = Query(False, description="Флаг, показывать просроченные"),
     item_type_id: int = Query(0, description="ID типа предмета"),
-    user=Depends(UnionAuth()),
+    user=Depends(UnionAuthChecker()),
 ):
     """
     Retrieves a list of rental sessions for the user with optional status filtering.

@@ -83,6 +83,7 @@ class RentalSessionGet(Base):
     actual_return_ts: datetime.datetime | None
     status: RentStatus
     strike_id: int | None = None
+    user_phone: str | None = None
 
 
 class RentalSessionPatch(Base):
