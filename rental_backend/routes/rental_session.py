@@ -52,7 +52,7 @@ async def check_sessions_overdue():
     rental_session_list: list[RentalSession] = (
         RentalSession.query(session=db.session)
         .filter(RentalSession.status == RentStatus.ACTIVE)
-        .filter(RentalSession.start_ts < datetime.datetime.now(tz=datetime.timezone.utc) - RENTAL_SESSION_OVERDUE)
+        .filter(RentalSession.deadline_ts < datetime.datetime.now(tz=datetime.timezone.utc))
         .all()
     )
 
@@ -74,7 +74,7 @@ async def create_rental_session(info: RentalSessionPost, user=Depends(UnionAuth(
     try:
         post_info = RentalSessionPost.model_dump()
     except:
-        ###  нормально прописать обработку ошибок
+        return ValueError
     item_type_id =post_info.item_type_id
     deadline_ts = post_info.deadline_ts
     """
