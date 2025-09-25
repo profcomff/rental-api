@@ -261,6 +261,7 @@ async def get_rental_sessions_common(
     is_expired: bool = False,
     item_type_id: int = 0,
     user_id: int = 0,
+    is_admin: bool = False,
 ):
     to_show = []
     if is_overdue:
@@ -279,19 +280,32 @@ async def get_rental_sessions_common(
         to_show.append(RentStatus.RESERVED)
 
     if not to_show:  # if everything false by default should show all
-        to_show = to_show = [
-            RentStatus.OVERDUE,
-            RentStatus.ACTIVE,
-            RentStatus.DISMISSED,
-            RentStatus.CANCELED,
-            RentStatus.EXPIRED,
-            RentStatus.RETURNED,
-            RentStatus.RESERVED,
-        ]
+        to_show = list(RentStatus)
 
     query = db_session.query(RentalSession).options(joinedload(RentalSession.strike))
     query = query.filter(RentalSession.status.in_(to_show))
-    status_order = case({status: i for i, status in enumerate(to_show)}, value=RentalSession.status)
+
+    if is_admin:
+        status_to_show = {
+            RentStatus.OVERDUE: 1,
+            RentStatus.ACTIVE: 2,
+            RentStatus.DISMISSED: 3,
+            RentStatus.CANCELED: 4,
+            RentStatus.EXPIRED: 5,
+            RentStatus.RETURNED: 6,
+            RentStatus.RESERVED: 7,
+        }
+    else:
+        status_to_show = {
+            RentStatus.OVERDUE: 1,
+            RentStatus.RESERVED: 2,
+            RentStatus.ACTIVE: 3,
+            RentStatus.DISMISSED: 4,
+            RentStatus.CANCELED: 5,
+            RentStatus.EXPIRED: 6,
+            RentStatus.RETURNED: 7,
+        }
+    status_order = case(status_to_show, value=RentalSession.status)
     query = query.order_by(status_order)
 
     if user_id != 0:
@@ -347,6 +361,7 @@ async def get_rental_sessions(
         is_expired=is_expired,
         item_type_id=item_type_id,
         user_id=user_id,
+        is_admin=True,
     )
 
 
