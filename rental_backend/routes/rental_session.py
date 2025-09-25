@@ -6,12 +6,11 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import case, or_
 from sqlalchemy.orm import joinedload
 
-from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists, ValueError
+from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
-from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost, RentalSessionPost
+from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost, RentalSessionPost, RentalSessionStartPatch
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
-
 
 settings: Settings = get_settings()
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
@@ -55,7 +54,6 @@ async def check_sessions_overdue():
         .filter(RentalSession.deadline_ts < datetime.datetime.now(tz=datetime.timezone.utc))
         .all()
     )
-
     for rental_session in rental_session_list:
         rental_session.status = RentStatus.OVERDUE
         ActionLogger.log_event(
@@ -133,7 +131,8 @@ async def create_rental_session(info: RentalSessionPost, user=Depends(UnionAuth(
 @rental_session.patch(
     "/{session_id}/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
-async def start_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+async def start_rental_session(info: RentalSessionStartPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+    valid_info = RentalSessionStartPatch.model_dump()
     """
     Starts a rental session, changing its status to ACTIVE.
 
@@ -145,25 +144,28 @@ async def start_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["
 
     Raises **ObjectNotFound** if the session with the specified ID is not found.
     """
-    session: RentalSession = RentalSession.get(id=session_id, session=db.session)
+    session: RentalSession = RentalSession.get(id=valid_info.session_id, session=db.session)
     if not session:
-        raise ObjectNotFound(RentalSession, session_id)
+        raise ObjectNotFound(RentalSession, valid_info.session_id)
     if session.status != RentStatus.RESERVED:
         raise ForbiddenAction(RentalSession)
-    updated_session = RentalSession.update(
-        session=db.session,
-        id=session_id,
-        status=RentStatus.ACTIVE,
-        start_ts=datetime.datetime.now(tz=datetime.timezone.utc),
-        admin_open_id=user.get("id"),
-    )
-
+    info_for_update = {
+        "session": db.session,
+        "id": valid_info.session_id,
+        "status": RentStatus.ACTIVE,
+        "start_ts": datetime.datetime.now(tz=datetime.timezone.utc),
+        "admin_open_id": user.get("id"),
+    }
+    if valid_info.deadline_ts:
+        info_for_update["deadline_ts"] = valid_info.deadline_ts
+        
+    updated_session = RentalSession.update(**info_for_update)
     ActionLogger.log_event(
         user_id=session.user_id,
         admin_id=user.get("id"),
         session_id=session.id,
         action_type="START_SESSION",
-        details={"status": RentStatus.ACTIVE},
+        details={"status": RentStatus.ACTIVE, "deadline_ts": valid_info.deadline_ts if valid_info.deadline_ts else datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, datetime.datetime.now().day, settings.BASE_OVERDUE, 0, 0)},
     )
 
     return RentalSessionGet.model_validate(updated_session)

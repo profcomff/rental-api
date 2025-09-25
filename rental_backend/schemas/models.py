@@ -97,3 +97,8 @@ class RentalSessionPatch(Base):
     end_ts: Optional[datetime.datetime] = None
     actual_return_ts: Optional[datetime.datetime] = None
     admin_close_id: Optional[int] = None
+
+
+class RentalSessionStartPatch(Base):
+    session_id: int
+    deadline_ts: datetime.datetime | None

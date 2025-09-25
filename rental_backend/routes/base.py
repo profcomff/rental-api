@@ -17,7 +17,6 @@ app = FastAPI(
     title='Сервис цифрового проката',
     description='Краткое описание',
     version=__version__,
-    # Отключаем нелокальную документацию
     root_path=settings.ROOT_PATH if __version__ != 'dev' else '',
     docs_url=None if __version__ != 'dev' else '/docs',
     redoc_url=None,

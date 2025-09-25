@@ -9,6 +9,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import text
 from .base import BaseDbModel
 
+from rental_backend.settings import Settings, get_settings
+settings: Settings = get_settings()
 
 class RentStatus(str, Enum):
     RESERVED: str = "reserved"
@@ -71,8 +73,7 @@ class RentalSession(BaseDbModel):
     deadline_ts: Mapped[datetime.datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, datetime.datetime.now().day, 16, 0, 0),
-        server_default=text("CURRENT_DATE + interval '16 hours'")
+        default=datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, datetime.datetime.now().day, settings.BASE_OVERDUE, 0, 0),
     )
     user_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     strike = relationship("Strike", uselist=False, back_populates="session")
