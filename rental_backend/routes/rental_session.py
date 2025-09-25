@@ -6,9 +6,9 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import case, or_
 from sqlalchemy.orm import joinedload
 
-from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
+from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists, ValueError
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
-from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
+from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost, RentalSessionPost
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
@@ -70,11 +70,18 @@ async def check_sessions_overdue():
 @rental_session.post(
     "/{item_type_id}", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
-async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
+async def create_rental_session(info: RentalSessionPost, user=Depends(UnionAuth())):
+    try:
+        post_info = RentalSessionPost.model_dump()
+    except:
+        ###  нормально прописать обработку ошибок
+    item_type_id =post_info.item_type_id
+    deadline_ts = post_info.deadline_ts
     """
     Создает новую сессию аренды для указанного типа предмета.
 
     :param item_type_id: Идентификатор типа предмета.
+    :param deadline_ts: Таймстемп дедлайна аренды.
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
     :raises SessionExists: Если у пользователя уже есть сессия с указанным типом предмета.
     """
@@ -107,6 +114,7 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
         user_phone=user.get("user_phone"),
+        deadline_ts = deadline_ts,
     )
     available_item.is_available = False
 
@@ -116,6 +124,7 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
         session_id=session.id,
         action_type="CREATE_SESSION",
         details={"item_id": session.item_id, "status": RentStatus.RESERVED},
+        deadline_ts = deadline_ts
     )
 
     return RentalSessionGet.model_validate(session)

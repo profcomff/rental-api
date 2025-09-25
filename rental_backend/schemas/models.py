@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional
-
+from pydantic import field_validator
 from rental_backend.models.db import RentStatus
 from rental_backend.schemas.base import Base
 
@@ -47,7 +47,6 @@ class EventGet(Base):
     create_ts: datetime.datetime
 
 
-# Модель для создания страйка
 class StrikePost(Base):
     user_id: int
     admin_id: int
@@ -55,7 +54,6 @@ class StrikePost(Base):
     session_id: int | None = None
 
 
-# Модель для получения страйка
 class StrikeGet(Base):
     id: int
     user_id: int
@@ -67,7 +65,14 @@ class StrikeGet(Base):
 
 class RentalSessionPost(Base):
     item_type_id: int
-    reservation_ts: datetime.datetime
+    deadline_ts: datetime.datetime | None
+
+    @field_validator('deadline_ts')
+    @classmethod
+    def check_deadline_ts(cls, value):
+        if value < datetime.datetime.now():
+            raise ValueError("Время дедлайна аренды не может быть меньше, текущего времени")
+        return value
 
 
 class RentalSessionGet(Base):
@@ -84,6 +89,7 @@ class RentalSessionGet(Base):
     status: RentStatus
     strike_id: int | None = None
     user_phone: str | None = None
+    deadline_ts: datetime.datetime | None = None
 
 
 class RentalSessionPatch(Base):
