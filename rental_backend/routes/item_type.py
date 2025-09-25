@@ -7,7 +7,7 @@ from sqlalchemy.orm import load_only
 from rental_backend.exceptions import ObjectNotFound, ValueError
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
-from rental_backend.schemas.models import ItemGet, ItemTypeAvailable, ItemTypeGet, ItemTypePost, RentStatus
+from rental_backend.schemas.models import ItemTypeAvailable, ItemTypeGet, ItemTypePost, RentStatus
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
@@ -52,6 +52,10 @@ async def get_items_types() -> list[ItemTypeGet]:
         item_type.free_items_count = (
             Item.query(session=db.session).filter(Item.type_id == item_type.id, Item.is_available == True).count()
         )
+        if item_type.free_items_count != 0:
+            item_type.availability = True
+        else:
+            item_type.availability = False
     return [ItemTypeGet.model_validate(item_type) for item_type in item_types_all]
 
 

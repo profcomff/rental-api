@@ -5,7 +5,7 @@ from enum import Enum
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, select
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import Mapped, load_only, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import text
 from .base import BaseDbModel
 
@@ -36,6 +36,9 @@ class ItemType(BaseDbModel):
 
     @classmethod
     def get_availability(cls, session, item_type_id: int, user_id: int) -> bool:
+        all_items = session.query(Item).filter(Item.type_id == item_type_id).count()
+        if all_items == 0:
+            return False
         result = (
             session.query(Item)
             .outerjoin(
@@ -71,7 +74,7 @@ class RentalSession(BaseDbModel):
         default=datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, datetime.datetime.now().day, 16, 0, 0),
         server_default=text("CURRENT_DATE + interval '16 hours'")
     )
-
+    user_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     strike = relationship("Strike", uselist=False, back_populates="session")
 
     strike = relationship("Strike", uselist=False, back_populates="session")
