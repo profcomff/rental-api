@@ -37,7 +37,7 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
 
 
 @item_type.get("", response_model=list[ItemTypeGet])
-async def get_items_types() -> list[ItemTypeGet]:
+async def get_items_types(user=Depends(UnionAuth())) -> list[ItemTypeGet]:
     """
     Retrieves a list of all item types.
 
@@ -52,10 +52,7 @@ async def get_items_types() -> list[ItemTypeGet]:
         item_type.free_items_count = (
             Item.query(session=db.session).filter(Item.type_id == item_type.id, Item.is_available == True).count()
         )
-        if item_type.free_items_count != 0:
-            item_type.availability = True
-        else:
-            item_type.availability = False
+        item_type.availability = item_type.get_availability(db.session, item_type.id, user.get("id"))
     return [ItemTypeGet.model_validate(item_type) for item_type in item_types_all]
 
 
