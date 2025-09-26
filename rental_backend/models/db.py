@@ -3,14 +3,17 @@ from __future__ import annotations
 import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, select
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, select, text
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import text
-from .base import BaseDbModel
 
 from rental_backend.settings import Settings, get_settings
+
+from .base import BaseDbModel
+
+
 settings: Settings = get_settings()
+
 
 class RentStatus(str, Enum):
     RESERVED: str = "reserved"
@@ -73,7 +76,14 @@ class RentalSession(BaseDbModel):
     deadline_ts: Mapped[datetime.datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, datetime.datetime.now().day, settings.BASE_OVERDUE, 0, 0),
+        default=datetime.datetime(
+            datetime.datetime.now().year,
+            datetime.datetime.now().month,
+            datetime.datetime.now().day,
+            settings.BASE_OVERDUE,
+            0,
+            0,
+        ),
     )
     user_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     strike = relationship("Strike", uselist=False, back_populates="session")

@@ -8,9 +8,17 @@ from sqlalchemy.orm import joinedload
 
 from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
-from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost, RentalSessionPost, RentalSessionStartPatch
+from rental_backend.schemas.models import (
+    RentalSessionGet,
+    RentalSessionPatch,
+    RentalSessionPost,
+    RentalSessionStartPatch,
+    RentStatus,
+    StrikePost,
+)
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
+
 
 settings: Settings = get_settings()
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
@@ -73,7 +81,7 @@ async def create_rental_session(info: RentalSessionPost, user=Depends(UnionAuth(
         post_info = RentalSessionPost.model_dump(info)
     except:
         return ValueError
-    item_type_id =post_info["item_type_id"]
+    item_type_id = post_info["item_type_id"]
     deadline_ts = post_info["deadline_ts"]
     """
     Создает новую сессию аренды для указанного типа предмета.
@@ -112,7 +120,7 @@ async def create_rental_session(info: RentalSessionPost, user=Depends(UnionAuth(
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
         user_phone=user.get("user_phone"),
-        deadline_ts = deadline_ts,
+        deadline_ts=deadline_ts,
     )
     available_item.is_available = False
 
@@ -122,7 +130,7 @@ async def create_rental_session(info: RentalSessionPost, user=Depends(UnionAuth(
         session_id=session.id,
         action_type="CREATE_SESSION",
         details={"item_id": session.item_id, "status": RentStatus.RESERVED},
-        deadline_ts = deadline_ts
+        deadline_ts=deadline_ts,
     )
 
     return RentalSessionGet.model_validate(session)
@@ -158,14 +166,28 @@ async def start_rental_session(info: RentalSessionStartPatch, user=Depends(Union
     }
     if valid_info["deadline_ts"]:
         info_for_update["deadline_ts"] = valid_info["deadline_ts"]
-        
+
     updated_session = RentalSession.update(**info_for_update)
     ActionLogger.log_event(
         user_id=session.user_id,
         admin_id=user.get("id"),
         session_id=session.id,
         action_type="START_SESSION",
-        details={"status": RentStatus.ACTIVE, "deadline_ts": valid_info["deadline_ts"] if valid_info["deadline_ts"] else datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, datetime.datetime.now().day, settings.BASE_OVERDUE, 0, 0)},
+        details={
+            "status": RentStatus.ACTIVE,
+            "deadline_ts": (
+                valid_info["deadline_ts"]
+                if valid_info["deadline_ts"]
+                else datetime.datetime(
+                    datetime.datetime.now().year,
+                    datetime.datetime.now().month,
+                    datetime.datetime.now().day,
+                    settings.BASE_OVERDUE,
+                    0,
+                    0,
+                )
+            ),
+        },
     )
 
     return RentalSessionGet.model_validate(updated_session)

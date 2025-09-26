@@ -1,6 +1,8 @@
 import datetime
 from typing import Optional
+
 from pydantic import field_validator
+
 from rental_backend.models.db import RentStatus
 from rental_backend.schemas.base import Base
 
