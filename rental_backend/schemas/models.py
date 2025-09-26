@@ -13,7 +13,7 @@ class ItemTypeGet(Base):
     image_url: str | None = None
     description: str | None = None
     free_items_count: int | None = None
-    availability: bool | None = None
+    availability: bool = False
 
 
 class ItemTypePost(Base):

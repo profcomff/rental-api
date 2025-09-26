@@ -14,7 +14,8 @@ class Settings(BaseSettings):
     SERVICE_ID: int = os.getenv("SERVICE_ID", -4)  # Указать id сервиса по умолчанию
     RENTAL_SESSION_EXPIRY_IN_MINUTES: int = 10
     RENTAL_SESSION_OVERDUE_IN_HOURS: int = 48  # Указать реальное значение
-
+    RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES: int = 30
+    RENTAL_SESSION_CREATE_NUMBER_LIMITER: int = 2
     CORS_ALLOW_ORIGINS: list[str] = ["*"]
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ["*"]

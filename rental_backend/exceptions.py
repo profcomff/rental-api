@@ -67,3 +67,11 @@ class SessionExists(RentalApiError):
             f"Session with an object of this type {obj_id_or_name} already exists",
             f"Сессия с объектом данного типа {obj_id_or_name} уже существует",
         )
+
+
+class RateLimiterError(RentalApiError):
+    def __init__(self, obj_id_or_name: int | str, minutes: int):
+        super().__init__(
+            f"Too many requests. Try again in {minutes} minutes",
+            f"Слишком много запросов. Попробуйте снова через {minutes} минут",
+        )

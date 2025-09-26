@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, select, text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, join, select, text
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -41,23 +41,24 @@ class ItemType(BaseDbModel):
 
     @classmethod
     def get_availability(cls, session, item_type_id: int, user_id: int) -> bool:
-        all_items = session.query(Item).filter(Item.type_id == item_type_id).count()
-        if all_items == 0:
-            return False
-        result = (
-            session.query(Item)
-            .outerjoin(
-                RentalSession,
-                and_(
-                    RentalSession.item_id == Item.id,
-                    RentalSession.user_id == user_id,
-                    RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED]),
-                ),
-            )
-            .filter(Item.type_id == item_type_id, Item.is_available == False, ~RentalSession.id.is_(None))
-            .one_or_none()
+
+        available_items_count = (
+            session.query(Item).filter(Item.type_id == item_type_id, Item.is_available == True).count()
         )
-        return result is None
+
+        if available_items_count == 0:
+            return False
+        user_active_rentals = (
+            session.query(RentalSession)
+            .join(Item, RentalSession.item_id == Item.id)
+            .filter(
+                RentalSession.user_id == user_id,
+                Item.type_id == item_type_id,
+                RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED, RentStatus.OVERDUE]),
+            )
+            .count()
+        )
+        return user_active_rentals == 0
 
 
 class RentalSession(BaseDbModel):

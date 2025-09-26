@@ -8,6 +8,7 @@ from rental_backend.exceptions import (
     InactiveSession,
     NoneAvailable,
     ObjectNotFound,
+    RateLimiterError,
     SessionExists,
     ValueError,
 )
@@ -69,4 +70,11 @@ async def session_exists_error_handler(req: starlette.requests.Request, exc: Ses
 async def value_error_handler(req: starlette.requests.Request, exc: ValueError):
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=422
+    )
+
+
+@app.exception_handler(RateLimiterError)
+async def rate_limiter_handler(req: starlette.requests.Request, exc: RateLimiterError):
+    return JSONResponse(
+        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=429
     )

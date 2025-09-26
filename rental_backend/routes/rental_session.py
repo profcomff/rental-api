@@ -6,7 +6,14 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import case, or_
 from sqlalchemy.orm import joinedload
 
-from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
+from rental_backend.exceptions import (
+    ForbiddenAction,
+    InactiveSession,
+    NoneAvailable,
+    ObjectNotFound,
+    RateLimiterError,
+    SessionExists,
+)
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.schemas.models import (
     RentalSessionGet,
@@ -91,21 +98,40 @@ async def create_rental_session(info: RentalSessionPost, user=Depends(UnionAuth(
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
     :raises SessionExists: Если у пользователя уже есть сессия с указанным типом предмета.
     """
-    exist_session_item: RentalSession = (
-        RentalSession.query(session=db.session)
-        .filter(
-            RentalSession.user_id == user.get("id"),
-            RentalSession.item_type_id == item_type_id,
-            or_(
-                RentalSession.status == RentStatus.RESERVED,
-                RentalSession.status == RentStatus.ACTIVE,
-                RentalSession.status == RentStatus.OVERDUE,
-            ),
-        )
-        .first()
+    exist_session_item: list[RentalSession] = RentalSession.query(session=db.session).filter(
+        RentalSession.user_id == user.get("id"), RentalSession.item_type_id == item_type_id
     )
-    if exist_session_item:
+    blocking_session = exist_session_item.filter(
+        or_(
+            RentalSession.status == RentStatus.RESERVED,
+            RentalSession.status == RentStatus.ACTIVE,
+            RentalSession.status == RentStatus.OVERDUE,
+        )
+    ).first()
+    if blocking_session:
         raise SessionExists(RentalSession, item_type_id)
+    # rate limiter
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    cutoff_time = now - datetime.timedelta(minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES)
+
+    rate_limiter_sessions = (
+        exist_session_item.filter(
+            or_(RentalSession.status == RentStatus.EXPIRED, RentalSession.status == RentStatus.CANCELED),
+            RentalSession.reservation_ts > cutoff_time,
+        )
+        .order_by(RentalSession.reservation_ts)
+        .all()
+    )
+
+    if len(rate_limiter_sessions) >= settings.RENTAL_SESSION_CREATE_NUMBER_LIMITER:
+        oldest_session_time = rate_limiter_sessions[0].reservation_ts
+        oldest_session_time = oldest_session_time.replace(tzinfo=datetime.timezone.utc)
+
+        reset_time = oldest_session_time + datetime.timedelta(
+            minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES
+        )
+        minutes_left = max(0, int((reset_time - now).total_seconds() / 60))
+        raise RateLimiterError(item_type_id, minutes_left)
 
     available_item: Item = (
         Item.query(session=db.session).filter(Item.type_id == item_type_id, Item.is_available == True).first()
@@ -294,6 +320,7 @@ async def get_rental_sessions_common(
     is_expired: bool = False,
     item_type_id: int = 0,
     user_id: int = 0,
+    is_admin: bool = False,
 ):
     to_show = []
     if is_overdue:
@@ -312,19 +339,32 @@ async def get_rental_sessions_common(
         to_show.append(RentStatus.RESERVED)
 
     if not to_show:  # if everything false by default should show all
-        to_show = to_show = [
-            RentStatus.OVERDUE,
-            RentStatus.ACTIVE,
-            RentStatus.DISMISSED,
-            RentStatus.CANCELED,
-            RentStatus.EXPIRED,
-            RentStatus.RETURNED,
-            RentStatus.RESERVED,
-        ]
+        to_show = list(RentStatus)
 
     query = db_session.query(RentalSession).options(joinedload(RentalSession.strike))
     query = query.filter(RentalSession.status.in_(to_show))
-    status_order = case({status: i for i, status in enumerate(to_show)}, value=RentalSession.status)
+
+    if is_admin:
+        status_to_show = {
+            RentStatus.OVERDUE: 1,
+            RentStatus.ACTIVE: 2,
+            RentStatus.DISMISSED: 3,
+            RentStatus.CANCELED: 4,
+            RentStatus.EXPIRED: 5,
+            RentStatus.RETURNED: 6,
+            RentStatus.RESERVED: 7,
+        }
+    else:
+        status_to_show = {
+            RentStatus.OVERDUE: 1,
+            RentStatus.RESERVED: 2,
+            RentStatus.ACTIVE: 3,
+            RentStatus.DISMISSED: 4,
+            RentStatus.CANCELED: 5,
+            RentStatus.EXPIRED: 6,
+            RentStatus.RETURNED: 7,
+        }
+    status_order = case(status_to_show, value=RentalSession.status)
     query = query.order_by(status_order)
 
     if user_id != 0:
@@ -380,6 +420,7 @@ async def get_rental_sessions(
         is_expired=is_expired,
         item_type_id=item_type_id,
         user_id=user_id,
+        is_admin=True,
     )
 
 
