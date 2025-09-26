@@ -72,6 +72,6 @@ class SessionExists(RentalApiError):
 class RateLimiterError(RentalApiError):
     def __init__(self, obj_id_or_name: int | str, minutes: int):
         super().__init__(
-            f"You are unable to reserve item of type {obj_id_or_name} because u tried to many times. Try again in {minutes} minutes.",
-            f"Вы не можете зарезервировать предмет типа {obj_id_or_name} потому что вы пытались слишком много раз. Попробуйте через {minutes} минут.",
+            f"Too many requests. Try again in {minutes} minutes",
+            f"Слишком много запросов. Попробуйте снова через {minutes} минут",
         )
