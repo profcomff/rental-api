@@ -6,7 +6,14 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import case, or_
 from sqlalchemy.orm import joinedload
 
-from rental_backend.exceptions import ForbiddenAction, InactiveSession, NoneAvailable, ObjectNotFound, SessionExists
+from rental_backend.exceptions import (
+    ForbiddenAction,
+    InactiveSession,
+    NoneAvailable,
+    ObjectNotFound,
+    RateLimiterError,
+    SessionExists,
+)
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.schemas.models import RentalSessionGet, RentalSessionPatch, RentStatus, StrikePost
 from rental_backend.settings import Settings, get_settings
@@ -78,21 +85,40 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
     :raises SessionExists: Если у пользователя уже есть сессия с указанным типом предмета.
     """
-    exist_session_item: RentalSession = (
-        RentalSession.query(session=db.session)
-        .filter(
-            RentalSession.user_id == user.get("id"),
-            RentalSession.item_type_id == item_type_id,
-            or_(
-                RentalSession.status == RentStatus.RESERVED,
-                RentalSession.status == RentStatus.ACTIVE,
-                RentalSession.status == RentStatus.OVERDUE,
-            ),
-        )
-        .first()
+    exist_session_item: list[RentalSession] = RentalSession.query(session=db.session).filter(
+        RentalSession.user_id == user.get("id"), RentalSession.item_type_id == item_type_id
     )
-    if exist_session_item:
+    blocking_session = exist_session_item.filter(
+        or_(
+            RentalSession.status == RentStatus.RESERVED,
+            RentalSession.status == RentStatus.ACTIVE,
+            RentalSession.status == RentStatus.OVERDUE,
+        )
+    ).first()
+    if blocking_session:
         raise SessionExists(RentalSession, item_type_id)
+    # rate limiter
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    cutoff_time = now - datetime.timedelta(minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES)
+
+    rate_limiter_sessions = (
+        exist_session_item.filter(
+            or_(RentalSession.status == RentStatus.EXPIRED, RentalSession.status == RentStatus.CANCELED),
+            RentalSession.reservation_ts > cutoff_time,
+        )
+        .order_by(RentalSession.reservation_ts)
+        .all()
+    )
+
+    if len(rate_limiter_sessions) >= settings.RENTAL_SESSION_CREATE_NUMBER_LIMITER:
+        oldest_session_time = rate_limiter_sessions[0].reservation_ts
+        oldest_session_time = oldest_session_time.replace(tzinfo=datetime.timezone.utc)
+
+        reset_time = oldest_session_time + datetime.timedelta(
+            minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES
+        )
+        minutes_left = max(0, int((reset_time - now).total_seconds() / 60))
+        raise RateLimiterError(item_type_id, minutes_left)
 
     available_item: Item = (
         Item.query(session=db.session).filter(Item.type_id == item_type_id, Item.is_available == True).first()
