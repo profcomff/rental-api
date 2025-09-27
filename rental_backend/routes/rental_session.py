@@ -153,7 +153,7 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
 
 
 @rental_session.patch(
-    "/{session_id}/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
+    "/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
 async def start_rental_session(info: RentalSessionStartPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
