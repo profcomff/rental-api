@@ -75,3 +75,9 @@ class RateLimiterError(RentalApiError):
             f"Too many requests. Try again in {minutes} minutes",
             f"Слишком много запросов. Попробуйте снова через {minutes} минут",
         )
+class InvalidDeadline(RentalApiError):
+    def __init__(self):
+        super().__init__(
+            "Deadline timestamp must be greater than current time", 
+            "Временная метка дедлайна должна быть больше текущего времени"
+        )
