@@ -85,6 +85,7 @@ class RentalSession(BaseDbModel):
             0,
             0,
         ),
+        server_default=text("CURRENT_DATE + interval '16 hours'"),
     )
     user_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     strike = relationship("Strike", uselist=False, back_populates="session")

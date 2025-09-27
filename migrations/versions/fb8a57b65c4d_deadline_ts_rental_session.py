@@ -17,7 +17,12 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('rental_session', sa.Column('deadline_ts', sa.DateTime(), nullable=False))
+    op.add_column(
+        'rental_session',
+        sa.Column(
+            'deadline_ts', sa.DateTime(), server_default=sa.text("CURRENT_DATE + interval '16 hours'"), nullable=False
+        ),
+    )
 
 
 def downgrade():
