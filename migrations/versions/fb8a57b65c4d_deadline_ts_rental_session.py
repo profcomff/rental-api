@@ -20,7 +20,7 @@ def upgrade():
     op.add_column(
         'rental_session',
         sa.Column(
-            'deadline_ts', sa.DateTime(), server_default=sa.text("CURRENT_DATE + interval '16 hours'"), nullable=False
+            'deadline_ts', sa.DateTime(), server_default=sa.text("CURRENT_DATE + interval '13 hours'"), nullable=False
         ),
     )
 
