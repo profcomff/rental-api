@@ -18,7 +18,6 @@ from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.schemas.models import (
     RentalSessionGet,
     RentalSessionPatch,
-    RentalSessionPost,
     RentalSessionStartPatch,
     RentStatus,
     StrikePost,

@@ -65,18 +65,6 @@ class StrikeGet(Base):
     create_ts: datetime.datetime
 
 
-class RentalSessionPost(Base):
-    item_type_id: int
-    deadline_ts: datetime.datetime | None
-
-    @field_validator('deadline_ts')
-    @classmethod
-    def check_deadline_ts(cls, value):
-        if value < datetime.datetime.now(tz=datetime.timezone.utc):
-            raise ValueError("Время дедлайна аренды не может быть меньше, текущего времени")
-        return value
-
-
 class RentalSessionGet(Base):
     id: int
     user_id: int
