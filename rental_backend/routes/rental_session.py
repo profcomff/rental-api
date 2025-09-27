@@ -9,11 +9,11 @@ from sqlalchemy.orm import joinedload
 from rental_backend.exceptions import (
     ForbiddenAction,
     InactiveSession,
+    InvalidDeadline,
     NoneAvailable,
     ObjectNotFound,
     RateLimiterError,
     SessionExists,
-    InvalidDeadline
 )
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.schemas.models import (
@@ -152,14 +152,21 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
 
     return RentalSessionGet.model_validate(session)
 
-def validate_deadline_ts(deadline_ts: datetime.datetime | None= Query(description="Deadline timestamp", default=None)):
-    if deadline_ts and deadline_ts.replace(tzinfo=datetime.timezone.utc) <= datetime.datetime.now(tz=datetime.timezone.utc):
+
+def validate_deadline_ts(deadline_ts: datetime.datetime | None = Query(description="Deadline timestamp", default=None)):
+    if deadline_ts and deadline_ts.replace(tzinfo=datetime.timezone.utc) <= datetime.datetime.now(
+        tz=datetime.timezone.utc
+    ):
         raise InvalidDeadline()
     return deadline_ts
+
+
 @rental_session.patch(
     "/{session_id}/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
-async def start_rental_session(session_id, deadline_ts = Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+async def start_rental_session(
+    session_id, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+):
     """
     Starts a rental session, changing its status to ACTIVE.
 

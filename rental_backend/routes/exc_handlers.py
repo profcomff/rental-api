@@ -6,12 +6,12 @@ from rental_backend.exceptions import (
     DateRangeError,
     ForbiddenAction,
     InactiveSession,
+    InvalidDeadline,
     NoneAvailable,
     ObjectNotFound,
     RateLimiterError,
     SessionExists,
     ValueError,
-    InvalidDeadline
 )
 from rental_backend.schemas.base import StatusResponseModel
 
@@ -79,6 +79,7 @@ async def rate_limiter_handler(req: starlette.requests.Request, exc: RateLimiter
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=429
     )
+
 
 @app.exception_handler(InvalidDeadline)
 async def invalid_deadline_handler(req: starlette.requests.Request, exc: RateLimiterError):
