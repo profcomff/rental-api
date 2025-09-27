@@ -9,6 +9,7 @@ from sqlalchemy.orm import joinedload
 from rental_backend.exceptions import (
     ForbiddenAction,
     InactiveSession,
+    InvalidDeadline,
     NoneAvailable,
     ObjectNotFound,
     RateLimiterError,
@@ -152,10 +153,20 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
     return RentalSessionGet.model_validate(session)
 
 
+def validate_deadline_ts(deadline_ts: datetime.datetime | None = Query(description="Deadline timestamp", default=None)):
+    if deadline_ts and deadline_ts.replace(tzinfo=datetime.timezone.utc) <= datetime.datetime.now(
+        tz=datetime.timezone.utc
+    ):
+        raise InvalidDeadline()
+    return deadline_ts
+
+
 @rental_session.patch(
     "/{session_id}/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
-async def start_rental_session(info: RentalSessionStartPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+async def start_rental_session(
+    session_id, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+):
     """
     Starts a rental session, changing its status to ACTIVE.
 
@@ -167,20 +178,20 @@ async def start_rental_session(info: RentalSessionStartPatch, user=Depends(Union
 
     Raises **ObjectNotFound** if the session with the specified ID is not found.
     """
-    session: RentalSession = RentalSession.get(id=info.session_id, session=db.session)
+    session: RentalSession = RentalSession.get(session_id, session=db.session)
     if not session:
         raise ObjectNotFound(RentalSession, info.session_id)
     if session.status != RentStatus.RESERVED:
         raise ForbiddenAction(RentalSession)
     info_for_update = {
         "session": db.session,
-        "id": info.session_id,
+        "id": session_id,
         "status": RentStatus.ACTIVE,
         "start_ts": datetime.datetime.now(tz=datetime.timezone.utc),
         "admin_open_id": user.get("id"),
     }
-    if info.deadline_ts:
-        info_for_update["deadline_ts"] = info.session_id
+    if deadline_ts:
+        info_for_update["deadline_ts"] = deadline_ts
 
     updated_session = RentalSession.update(**info_for_update)
     ActionLogger.log_event(
@@ -190,18 +201,7 @@ async def start_rental_session(info: RentalSessionStartPatch, user=Depends(Union
         action_type="START_SESSION",
         details={
             "status": RentStatus.ACTIVE,
-            "deadline_ts": (
-                info.deadline_ts
-                if info.deadline_ts
-                else datetime.datetime(
-                    datetime.datetime.now().year,
-                    datetime.datetime.now().month,
-                    datetime.datetime.now().day,
-                    settings.BASE_OVERDUE,
-                    0,
-                    0,
-                )
-            ),
+            "deadline_ts": str(updated_session.deadline_ts),
         },
     )
 
