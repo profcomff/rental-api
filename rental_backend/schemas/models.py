@@ -90,7 +90,6 @@ class RentalSessionPatch(Base):
 
 
 class RentalSessionStartPatch(Base):
-    session_id: int
     deadline_ts: datetime.datetime | None
 
     @field_validator('deadline_ts')
