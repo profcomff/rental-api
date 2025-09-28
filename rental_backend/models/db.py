@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, select, text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, func, select, text
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -59,6 +59,14 @@ class ItemType(BaseDbModel):
             .count()
         )
         return user_active_rentals == 0
+
+    @hybrid_property
+    def available_items_count(self) -> int:
+        return sum(1 for item in self.items if item.is_available)
+
+    @available_items_count.expression
+    def available_items_count(cls):
+        return select(func.count(Item.id)).where(Item.type_id == cls.id, Item.is_available == True).scalar_subquery()
 
 
 class RentalSession(BaseDbModel):
