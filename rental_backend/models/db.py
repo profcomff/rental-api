@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, and_, join, select, text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, select, text
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
