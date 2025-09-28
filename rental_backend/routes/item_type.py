@@ -194,8 +194,7 @@ async def delete_item_type(
     item_type_to_delete = ItemType.get(id, session=db.session)
     if item_type_to_delete is None:
         raise ObjectNotFound(ItemType, id)
-    items = db.session.query(Item).filter(Item.type_id == id).count()
-    if items > 0:
+    if len(item_type_to_delete.items) > 0:
         raise ForbiddenAction(ItemType)
     ItemType.delete(id, session=db.session)
     ActionLogger.log_event(
