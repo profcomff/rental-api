@@ -4,7 +4,7 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 from sqlalchemy.orm import load_only
 
-from rental_backend.exceptions import ObjectNotFound, ValueError
+from rental_backend.exceptions import ForbiddenAction, ObjectNotFound, ValueError
 from rental_backend.models.db import Item, ItemType, RentalSession
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemTypeAvailable, ItemTypeGet, ItemTypePost, RentStatus
@@ -188,10 +188,14 @@ async def delete_item_type(
     Returns a status response.
 
     Raises **ObjectNotFound** if the item type with the specified ID is not found.
+
+    Raises **ForbiddenAction** if the item type with the specified ID has items.
     """
     item_type_to_delete = ItemType.get(id, session=db.session)
     if item_type_to_delete is None:
         raise ObjectNotFound(ItemType, id)
+    if len(item_type_to_delete.items) > 0:
+        raise ForbiddenAction(ItemType)
     ItemType.delete(id, session=db.session)
     ActionLogger.log_event(
         user_id=None,
