@@ -27,11 +27,12 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
 
     Raises **ObjectNotFound** if the item type with the specified ID is not found.
     """
+
     item_type: ItemType = ItemType.query(session=db.session).filter(ItemType.id == id).one_or_none()
+    available_count = db.session.query(ItemType.available_items_count).filter(ItemType.id == id).scalar()
+    item_type.free_items_count = available_count
     if item_type is None:
         raise ObjectNotFound(ItemType, id)
-    free_items_count: int = len(item_type.items)
-    item_type.free_items_count = free_items_count
     item_type.availability = ItemType.get_availability(db.session, item_type.id, user.get("id"))
     return ItemTypeGet.model_validate(item_type)
 
@@ -49,9 +50,6 @@ async def get_items_types(user=Depends(UnionAuth())) -> list[ItemTypeGet]:
     if not item_types_all:
         raise ObjectNotFound(ItemType, 'all')
     for item_type in item_types_all:
-        item_type.free_items_count = (
-            Item.query(session=db.session).filter(Item.type_id == item_type.id, Item.is_available == True).count()
-        )
         item_type.availability = item_type.get_availability(db.session, item_type.id, user.get("id"))
     return [ItemTypeGet.model_validate(item_type) for item_type in item_types_all]
 
