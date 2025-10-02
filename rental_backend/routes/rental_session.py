@@ -82,9 +82,11 @@ async def check_sessions_overdue():
 @rental_session.post(
     "/{item_type_id}", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
-async def create_rental_session(item_type_id: int, user=Depends(UnionAuth())):
+async def create_rental_session(item_type_id: int, user=Depends(UnionAuth(scopes=["rental.session.create"]))):
     """
     Создает новую сессию аренды для указанного типа предмета.
+
+    Cкоупы: `["rental.session.create"]`
 
     :param item_type_id: Идентификатор типа предмета.
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
