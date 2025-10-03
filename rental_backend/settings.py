@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     ROOT_PATH: str = "/" + os.getenv("APP_NAME", "")
 
     SERVICE_ID: int = os.getenv("SERVICE_ID", -4)  # Указать id сервиса по умолчанию
-    RENTAL_SESSION_EXPIRY_IN_MINUTES: int = 10
+    RENTAL_SESSION_EXPIRY_IN_MINUTES: int = 15
     RENTAL_SESSION_OVERDUE_IN_HOURS: int = 48  # Указать реальное значение
     RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES: int = 30
     RENTAL_SESSION_CREATE_NUMBER_LIMITER: int = 2
