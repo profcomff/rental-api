@@ -31,7 +31,6 @@ async def create_strike(
     If session does not exist returns ObjectNotFound.
     """
     sessions = db.session.query(RentalSession).filter(RentalSession.id == strike_info.session_id).one_or_none()
-    print(sessions)
     if not sessions:
         raise ObjectNotFound(RentalSession, strike_info.session_id)
     new_strike = Strike.create(
