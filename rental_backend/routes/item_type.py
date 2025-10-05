@@ -29,10 +29,10 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
     """
 
     item_type: ItemType = ItemType.query(session=db.session).filter(ItemType.id == id).one_or_none()
-    available_count = db.session.query(ItemType.available_items_count).filter(ItemType.id == id).scalar()
-    item_type.free_items_count = available_count
     if item_type is None:
         raise ObjectNotFound(ItemType, id)
+    available_count = db.session.query(ItemType.available_items_count).filter(ItemType.id == id).scalar()
+    item_type.free_items_count = available_count
     item_type.availability = ItemType.get_availability(db.session, item_type.id, user.get("id"))
     return ItemTypeGet.model_validate(item_type)
 
@@ -130,6 +130,9 @@ async def make_item_type_available(
     """
     if count < 0:
         raise ValueError(count)
+    types = db.session.query(ItemType).filter(ItemType.id == id).one_or_none()
+    if not types:
+        raise ObjectNotFound(ItemType, id)
     items = (
         db.session.query(Item)
         .outerjoin(
