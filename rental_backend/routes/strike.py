@@ -99,8 +99,10 @@ async def get_strikes(
     return [StrikeGet.model_validate(strike) for strike in strikes]
 
 
-@strike.delete("/{id}")
-async def delete_strike(id: int, user=Depends(UnionAuth(scopes=["rental.strike.delete"], allow_none=False))) -> dict:
+@strike.delete("/{id}", response_model=StatusResponseModel)
+async def delete_strike(
+    id: int, user=Depends(UnionAuth(scopes=["rental.strike.delete"], allow_none=False))
+) -> StatusResponseModel:
     """
     Deletes a strike by its ID.
 
@@ -121,5 +123,6 @@ async def delete_strike(id: int, user=Depends(UnionAuth(scopes=["rental.strike.d
         admin_id=user.get('id'),
         session_id=None,
         action_type="DELETE_STRIKE",
+        details={"id": id},
     )
     return StatusResponseModel(status="success", message="Strike deleted successfully", ru="Страйк успешно удален")
