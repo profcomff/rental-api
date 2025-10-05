@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
 from rental_backend.exceptions import DateRangeError, ObjectNotFound
-from rental_backend.models.db import Strike
+from rental_backend.models.db import RentalSession, Strike
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import StrikeGet, StrikePost
 from rental_backend.utils.action import ActionLogger
@@ -27,7 +27,13 @@ async def create_strike(
     - **strike_info**: The data for the new strike.
 
     Returns the created strike.
+
+    If session does not exist returns ObjectNotFound.
     """
+    sessions = db.session.query(RentalSession).filter(RentalSession.id == strike_info.session_id).one_or_none()
+    print(sessions)
+    if not sessions:
+        raise ObjectNotFound(RentalSession, strike_info.session_id)
     new_strike = Strike.create(
         session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
     )
