@@ -103,9 +103,9 @@ async def delete_item(
 
     Returns a status response.
 
-    Raises **ObjectNotFound** if the item with the specified ID is not found.
+    Raises **ObjectNotFound** if the item with the specified ID is not found or it is unavailable.
     """
-    item = Item.get(id, session=db.session)
+    item = db.session.query(Item).filter(Item.id == id, Item.is_available == True).one_or_none()
     if item is None:
         raise ObjectNotFound(Item, id)
     Item.delete(id, session=db.session)
