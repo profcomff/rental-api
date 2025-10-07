@@ -79,6 +79,7 @@ class RentalSessionGet(Base):
     status: RentStatus
     strike_id: int | None = None
     user_phone: str | None = None
+    user_fullname: str | None = None
     deadline_ts: datetime.datetime | None = None
 
 
