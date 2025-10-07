@@ -136,14 +136,18 @@ async def create_rental_session(
         raise NoneAvailable(ItemType, item_type_id)
     # получаем ФИО и номер телефона из userdata
     userdata_info = user.get("userdata")
-    phone_number_info = list(filter(lambda x: "Номер телефона" in x, userdata_info))
+    full_name_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
+    phone_number_info = list(filter(lambda x: "Номер телефона" == x['param'], userdata_info))
+    full_name = full_name_info[0]["value"] if len(full_name_info) != 0 else None
+    phone_number = phone_number_info[0]["value"] if len(phone_number_info) != 0 else None
     session = RentalSession.create(
         session=db.session,
         user_id=user.get("id"),
         item_id=available_item.id,
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
-        user_phone=phone_number_info[0]["value"] if len(phone_number_info) != 0 else None,
+        user_phone=phone_number,
+        user_fullname=full_name,
     )
     available_item.is_available = False
 
