@@ -82,7 +82,9 @@ async def check_sessions_overdue():
 @rental_session.post(
     "/{item_type_id}", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
-async def create_rental_session(item_type_id: int, user=Depends(UnionAuth(scopes=["rental.session.create"]))):
+async def create_rental_session(
+    item_type_id: int, user=Depends(UnionAuth(scopes=["rental.session.create"], enable_userdata=True))
+):
     """
     Создает новую сессию аренды для указанного типа предмета.
 
@@ -132,14 +134,16 @@ async def create_rental_session(item_type_id: int, user=Depends(UnionAuth(scopes
     )
     if not available_item:
         raise NoneAvailable(ItemType, item_type_id)
-
+    # получаем ФИО и номер телефона из userdata
+    userdata_info = user.get("userdata")
+    phone_number_info = list(filter(lambda x: "Номер телефона" in x, userdata_info))
     session = RentalSession.create(
         session=db.session,
         user_id=user.get("id"),
         item_id=available_item.id,
         reservation_ts=datetime.datetime.now(tz=datetime.timezone.utc),
         status=RentStatus.RESERVED,
-        user_phone=user.get("user_phone"),
+        user_phone=phone_number_info[0]["value"] if len(phone_number_info) != 0 else None,
     )
     available_item.is_available = False
 
