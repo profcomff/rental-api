@@ -201,6 +201,12 @@ async def start_rental_session(
     }
     if deadline_ts:
         info_for_update["deadline_ts"] = deadline_ts
+    else:
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        new_deadline = now.replace(hour=settings.BASE_OVERDUE, minute=0, second=0, microsecond=0)
+        if now > new_deadline:
+            new_deadline = now.replace(day=now.day + 1, hour=settings.BASE_OVERDUE, minute=0, second=0, microsecond=0)
+        info_for_update["deadline_ts"] = new_deadline
 
     updated_session = RentalSession.update(**info_for_update)
     ActionLogger.log_event(
