@@ -30,6 +30,7 @@ class Item(BaseDbModel):
     type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"))
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
     type: Mapped["ItemType"] = relationship("ItemType", back_populates="items")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class ItemType(BaseDbModel):
@@ -38,6 +39,7 @@ class ItemType(BaseDbModel):
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     items: Mapped[list[Item]] = relationship("Item", back_populates="type")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @classmethod
     def get_availability(cls, session, item_type_id: int, user_id: int) -> bool:
@@ -101,6 +103,7 @@ class RentalSession(BaseDbModel):
 
     strike = relationship("Strike", uselist=False, back_populates="session")
     item: Mapped["Item"] = relationship("Item")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @hybrid_property
     def item_type_id(self) -> int | None:
@@ -119,6 +122,7 @@ class Event(BaseDbModel):
     action_type: Mapped[str] = mapped_column(String, nullable=False)
     details: Mapped[dict] = mapped_column(JSON, nullable=True)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class Strike(BaseDbModel):
@@ -129,3 +133,4 @@ class Strike(BaseDbModel):
     reason: Mapped[str] = mapped_column(String)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime)
     session = relationship("RentalSession", back_populates="strike")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
