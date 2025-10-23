@@ -38,7 +38,9 @@ class ItemType(BaseDbModel):
     name: Mapped[str] = mapped_column(String, nullable=False)
     image_url: Mapped[str | None] = mapped_column(String, nullable=True)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
-    items: Mapped[list[Item]] = relationship("Item", back_populates="type")
+    items: Mapped[list[Item]] = relationship(
+        "Item", back_populates="type", primaryjoin="and_(ItemType.id==Item.type_id, Item.is_deleted==False)"
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @classmethod
