@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ["*"]
     CORS_ALLOW_HEADERS: list[str] = ["*"]
-    BASE_OVERDUE: int = 19  # at this amount of hours all items become overdue (at utc format)
+    BASE_OVERDUE: int = 18  # at this amount of hours all items become overdue (at utc format)
     model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
 
 
