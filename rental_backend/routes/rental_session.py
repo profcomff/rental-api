@@ -42,6 +42,7 @@ async def check_sessions_expiration():
         RentalSession.query(session=db.session)
         .filter(RentalSession.status == RentStatus.RESERVED)
         .filter(RentalSession.reservation_ts < datetime.datetime.now(tz=datetime.timezone.utc) - RENTAL_SESSION_EXPIRY)
+        .filter(RentalSession.is_deleted == False)
         .all()
     )
 
@@ -66,6 +67,7 @@ async def check_sessions_overdue():
         RentalSession.query(session=db.session)
         .filter(RentalSession.status == RentStatus.ACTIVE)
         .filter(RentalSession.deadline_ts < datetime.datetime.now(tz=datetime.timezone.utc))
+        .filter(RentalSession.is_deleted == False)
         .all()
     )
     for rental_session in rental_session_list:
@@ -97,7 +99,7 @@ async def create_rental_session(
     """
     exist_session_item: list[RentalSession] = RentalSession.query(session=db.session).filter(
         RentalSession.user_id == user.get("id"), RentalSession.item_type_id == item_type_id
-    )
+    ).filter(RentalSession.is_deleted == False)
     blocking_session = exist_session_item.filter(
         or_(
             RentalSession.status == RentStatus.RESERVED,
@@ -115,7 +117,7 @@ async def create_rental_session(
         exist_session_item.filter(
             or_(RentalSession.status == RentStatus.EXPIRED, RentalSession.status == RentStatus.CANCELED),
             RentalSession.reservation_ts > cutoff_time,
-        )
+        ).filter(RentalSession.is_deleted == False)
         .order_by(RentalSession.reservation_ts)
         .all()
     )
@@ -303,6 +305,7 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["re
         db.session.query(RentalSession)
         .options(joinedload(RentalSession.strike))
         .filter(RentalSession.id == session_id)
+        .filter(RentalSession.is_deleted == False)
         .first()
     )
 
@@ -347,7 +350,7 @@ async def get_rental_sessions_common(
         to_show = list(RentStatus)
 
     query = db_session.query(RentalSession).options(joinedload(RentalSession.strike))
-    query = query.filter(RentalSession.status.in_(to_show))
+    query = query.filter(RentalSession.status.in_(to_show)).filter(RentalSession.is_deleted == False)
 
     if is_admin:
         status_to_show = {
@@ -497,6 +500,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
         id=session_id,
         status=RentStatus.CANCELED,
         end_ts=datetime.datetime.now(tz=datetime.timezone.utc),
+        is_deleted=True,
     )
     session.item.is_available = True
 
