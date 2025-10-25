@@ -97,9 +97,11 @@ async def create_rental_session(
     :raises NoneAvailable: Если нет доступных предметов указанного типа.
     :raises SessionExists: Если у пользователя уже есть сессия с указанным типом предмета.
     """
-    exist_session_item: list[RentalSession] = RentalSession.query(session=db.session).filter(
-        RentalSession.user_id == user.get("id"), RentalSession.item_type_id == item_type_id
-    ).filter(RentalSession.is_deleted == False)
+    exist_session_item: list[RentalSession] = (
+        RentalSession.query(session=db.session)
+        .filter(RentalSession.user_id == user.get("id"), RentalSession.item_type_id == item_type_id)
+        .filter(RentalSession.is_deleted == False)
+    )
     blocking_session = exist_session_item.filter(
         or_(
             RentalSession.status == RentStatus.RESERVED,
@@ -117,7 +119,8 @@ async def create_rental_session(
         exist_session_item.filter(
             or_(RentalSession.status == RentStatus.EXPIRED, RentalSession.status == RentStatus.CANCELED),
             RentalSession.reservation_ts > cutoff_time,
-        ).filter(RentalSession.is_deleted == False)
+        )
+        .filter(RentalSession.is_deleted == False)
         .order_by(RentalSession.reservation_ts)
         .all()
     )
