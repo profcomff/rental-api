@@ -97,7 +97,7 @@ class RentalSession(BaseDbModel):
             0,
             0,
         ),
-        server_default=text("CURRENT_DATE + interval '13 hours'"),
+        server_default=text("CURRENT_DATE + interval '18 hours'"),
     )
     user_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     user_fullname: Mapped[str | None] = mapped_column(String, nullable=True)
