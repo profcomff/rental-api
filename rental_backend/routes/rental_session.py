@@ -477,6 +477,40 @@ async def get_my_sessions(
     )
 
 
+@rental_session.delete("/{session_id}", response_model=RentalSessionGet)
+async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+    """
+    Deletes a session.
+
+    Scopes: `["rental.session.admin"]`
+
+    - **session_id**: The ID of the rental session to delete.
+
+    Returns the deleted rental session.
+
+    Raises **ForbiddenAction** if the session is in RESERVED or ACTIVE status.
+    Raises **ObjectNotFound** if the session does not exist.
+    """
+    session = RentalSession.get(id=session_id, session=db.session)
+    if not session:
+        raise ObjectNotFound(RentalSession, session_id)
+    if session.status == RentStatus.ACTIVE or session.status == RentStatus.RESERVED:
+        raise ForbiddenAction(RentalSession)
+
+    updated_session = RentalSession.update(session=db.session, id=session_id, is_deleted=True)
+    session.item.is_available = True
+
+    ActionLogger.log_event(
+        user_id=user.get("id"),
+        admin_id=None,
+        session_id=session.id,
+        action_type="DELETE_SESSION",
+        details={"id": session_id},
+    )
+
+    return RentalSessionGet.model_validate(updated_session)
+
+
 @rental_session.delete(
     "/{session_id}/cancel", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
@@ -503,7 +537,6 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
         id=session_id,
         status=RentStatus.CANCELED,
         end_ts=datetime.datetime.now(tz=datetime.timezone.utc),
-        is_deleted=True,
     )
     session.item.is_available = True
 
