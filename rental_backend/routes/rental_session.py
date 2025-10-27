@@ -16,6 +16,7 @@ from rental_backend.exceptions import (
     SessionExists,
 )
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
+from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import (
     RentalSessionGet,
     RentalSessionPatch,
@@ -467,6 +468,35 @@ async def get_my_sessions(
         is_expired=is_expired,
         item_type_id=item_type_id,
         user_id=user.get('id'),
+    )
+
+
+@rental_session.delete("/{session_id}", response_model=StatusResponseModel)
+async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+    """
+    Deletes a session.
+
+    Scopes: `["rental.session.admin"]`
+
+    - **session_id**: The ID of the rental session to delete.
+
+    Returns the deleted rental session.
+
+    Raises **ForbiddenAction** if the session is in RESERVED or ACTIVE status.
+    Raises **ObjectNotFound** if the session does not exist.
+    """
+    session = RentalSession.get(id=session_id, session=db.session)
+    if (
+        session.status == RentStatus.ACTIVE
+        or session.status == RentStatus.RESERVED
+        or session.status == RentStatus.OVERDUE
+    ):
+        raise ForbiddenAction(RentalSession)
+    RentalSession.delete(id=session_id, session=db.session)
+    return StatusResponseModel(
+        status="Success",
+        message=f"Rental session with id = {session_id} has been deleted",
+        ru="Сессия удалена из RentalAPI",
     )
 
 
