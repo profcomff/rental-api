@@ -494,7 +494,9 @@ async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=[
         raise ForbiddenAction(RentalSession)
     RentalSession.delete(id=session_id, session=db.session)
     return StatusResponseModel(
-        status="Success", message="Rental session has been deleted", ru="Сессия удалена из RentalAPI"
+        status="Success",
+        message=f"Rental session with id = {session_id} has been deleted",
+        ru="Сессия удалена из RentalAPI",
     )
 
 
