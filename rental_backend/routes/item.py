@@ -4,7 +4,7 @@ from fastapi_sqlalchemy import db
 
 from rental_backend import settings
 from rental_backend.exceptions import ObjectNotFound
-from rental_backend.models.db import Item, ItemType
+from rental_backend.models.db import Item, ItemType, RentalSession, RentStatus, Strike, Event
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemGet, ItemPost
 from rental_backend.settings import Settings, get_settings
@@ -105,10 +105,19 @@ async def delete_item(
 
     Raises **ObjectNotFound** if the item with the specified ID is not found.
     """
-    item = Item.get(id, session=db.session)
-    if item is None:
+    rental_sessions = db.session.query(RentalSession).filter(RentalSession.item_id == id)
+    session = rental_sessions.filter(RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.OVERDUE, RentStatus.RESERVED])).one_or_none()
+    if session is not None:
         raise ObjectNotFound(Item, id)
     Item.delete(id, session=db.session)
+    for rental_session in rental_sessions:
+        RentalSession.delete(rental_session.id, session=db.session)
+        strikes = db.session.query(Strike).filter(Strike.session_id == rental_session.id)
+        for strike in strikes:
+            Strike.delete(strike.id, session=db.session)
+        events = db.session.query(Event).filter(Event.session_id == rental_session.id)
+        for event in events:
+            Event.delete(event.id, session=db.session)
     ActionLogger.log_event(
         user_id=None,
         admin_id=user.get('id'),
