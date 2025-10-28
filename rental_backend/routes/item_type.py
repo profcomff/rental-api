@@ -31,10 +31,9 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
     item_type: ItemType = ItemType.query(session=db.session).filter(ItemType.id == id).one_or_none()
     if item_type is None:
         raise ObjectNotFound(ItemType, id)
-    available_count = db.session.query(ItemType.available_items_count).filter(ItemType.id == id).scalar()
-    item_type.free_items_count = available_count
-    item_type.availability = ItemType.get_availability(db.session, item_type.id, user.get("id"))
-    return ItemTypeGet.model_validate(item_type)
+    result: ItemTypeGet = ItemTypeGet.model_validate(item_type)
+    result.availability = ItemType.get_availability(db.session, item_type, user.get("id"))
+    return result
 
 
 @item_type.get("", response_model=list[ItemTypeGet])
@@ -49,9 +48,24 @@ async def get_items_types(user=Depends(UnionAuth())) -> list[ItemTypeGet]:
     item_types_all: list[ItemType] = ItemType.query(session=db.session).all()
     if not item_types_all:
         raise ObjectNotFound(ItemType, 'all')
+    item_type_data_map: dict[int, tuple[bool, int]] = ItemType.get_availability_and_count_batch(
+        db.session, item_types_all, user.get("id")
+    )
+    result: list[ItemTypeGet] = []
     for item_type in item_types_all:
-        item_type.availability = item_type.get_availability(db.session, item_type.id, user.get("id"))
-    return [ItemTypeGet.model_validate(item_type) for item_type in item_types_all]
+        item_type: ItemType
+        item_type_data = item_type_data_map.get(item_type.id, [False, 0])
+        result.append(
+            ItemTypeGet(
+                id=item_type.id,
+                name=item_type.name,
+                image_url=item_type.image_url,
+                description=item_type.description,
+                available_items_count=item_type_data[1],
+                availability=item_type_data[0],
+            )
+        )
+    return result
 
 
 @item_type.post("", response_model=ItemTypeGet)
