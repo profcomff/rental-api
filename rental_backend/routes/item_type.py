@@ -6,6 +6,7 @@ from sqlalchemy.orm import load_only
 
 from rental_backend.exceptions import ForbiddenAction, ObjectNotFound, ValueError
 from rental_backend.models.db import Item, ItemType, RentalSession
+from rental_backend.routes.rental_session import check_sessions_expiration
 from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import ItemTypeAvailable, ItemTypeGet, ItemTypePost, RentStatus
 from rental_backend.settings import Settings, get_settings
@@ -16,7 +17,7 @@ settings: Settings = get_settings()
 item_type = APIRouter(prefix="/itemtype", tags=["ItemType"])
 
 
-@item_type.get("/{id}", response_model=ItemTypeGet)
+@item_type.get("/{id}", response_model=ItemTypeGet, dependencies=[Depends(check_sessions_expiration)])
 async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
     """
     Retrieves information about an item type by its ID.
@@ -36,7 +37,7 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
     return result
 
 
-@item_type.get("", response_model=list[ItemTypeGet])
+@item_type.get("", response_model=list[ItemTypeGet], dependencies=[Depends(check_sessions_expiration)])
 async def get_items_types(user=Depends(UnionAuth())) -> list[ItemTypeGet]:
     """
     Retrieves a list of all item types.
