@@ -83,7 +83,8 @@ async def check_sessions_overdue():
     "/{item_type_id}", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
 async def create_rental_session(
-    item_type_id: int, user=Depends(UnionAuth(scopes=["rental.session.create"], enable_userdata=True))
+    item_type_id: int,
+    user=Depends(UnionAuth(enable_userdata=True)),  # scopes=["rental.session.create"] добавить для прода
 ):
     """
     Создает новую сессию аренды для указанного типа предмета.
