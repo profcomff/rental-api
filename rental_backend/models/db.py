@@ -3,7 +3,21 @@ from __future__ import annotations
 import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, func, select, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    and_,
+    case,
+    exists,
+    func,
+    not_,
+    select,
+    text,
+)
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -29,8 +43,9 @@ class Item(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     type_id: Mapped[int] = mapped_column(Integer, ForeignKey("item_type.id"))
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
-    type: Mapped["ItemType"] = relationship("ItemType", back_populates="items")
+    type: Mapped[ItemType] = relationship("ItemType", back_populates="items")
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sessions: Mapped[list[RentalSession]] = relationship("RentalSession", back_populates="item")
 
 
 class ItemType(BaseDbModel):
@@ -43,34 +58,81 @@ class ItemType(BaseDbModel):
     )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    @classmethod
-    def get_availability(cls, session, item_type_id: int, user_id: int) -> bool:
-
-        available_items_count = (
-            session.query(Item).filter(Item.type_id == item_type_id, Item.is_available == True).count()
+    @staticmethod
+    def get_availability(session, item_type_data: ItemType, user_id: int) -> bool:
+        item_type_id = item_type_data.id
+        occupied_stmt = exists().where(
+            RentalSession.user_id == user_id,
+            RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED, RentStatus.OVERDUE]),
+            RentalSession.item.has(Item.type_id == item_type_id),
         )
+        available_stmt = exists().where(
+            Item.type_id == item_type_id,
+            Item.is_available == True,
+        )
+        is_available_for_user = bool(
+            session.query(
+                and_(
+                    not_(occupied_stmt),
+                    available_stmt,
+                )
+            ).scalar()
+        )
+        return is_available_for_user
 
-        if available_items_count == 0:
-            return False
-        user_active_rentals = (
-            session.query(RentalSession)
-            .join(Item, RentalSession.item_id == Item.id)
-            .filter(
-                RentalSession.user_id == user_id,
-                Item.type_id == item_type_id,
-                RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED, RentStatus.OVERDUE]),
+    @staticmethod
+    def get_availability_and_count_batch(
+        session, item_type_data: list[ItemType], user_id: int
+    ) -> dict[int, tuple[bool, int]]:
+        item_type_ids = [it.id for it in item_type_data]
+
+        available_count_subq = (
+            select(Item.type_id.label("type_id"), func.count().label("available_count"))
+            .where(Item.is_available == True, Item.is_deleted == False)
+            .group_by(Item.type_id)
+            .subquery()
+        )
+        stmt = (
+            select(
+                ItemType.id.label("item_type_id"),
+                case(
+                    (
+                        and_(
+                            exists().where(
+                                Item.type_id == ItemType.id,
+                                Item.is_available == True,
+                            ),
+                            not_(
+                                exists().where(
+                                    RentalSession.user_id == user_id,
+                                    RentalSession.status.in_(
+                                        [
+                                            RentStatus.ACTIVE,
+                                            RentStatus.RESERVED,
+                                            RentStatus.OVERDUE,
+                                        ]
+                                    ),
+                                    RentalSession.item.has(Item.type_id == ItemType.id),
+                                )
+                            ),
+                        ),
+                        True,
+                    ),
+                    else_=False,
+                ).label("is_available_for_user"),
+                func.coalesce(available_count_subq.c.available_count, 0).label("available_items_count"),
             )
-            .count()
+            .outerjoin(available_count_subq, available_count_subq.c.type_id == ItemType.id)
+            .where(ItemType.id.in_(item_type_ids))
         )
-        return user_active_rentals == 0
+
+        results = session.execute(stmt).all()
+        result_map = {r.item_type_id: (r.is_available_for_user, r.available_items_count) for r in results}
+        return result_map
 
     @hybrid_property
     def available_items_count(self) -> int:
         return sum(1 for item in self.items if item.is_available)
-
-    @available_items_count.expression
-    def available_items_count(cls):
-        return select(func.count(Item.id)).where(Item.type_id == cls.id, Item.is_available == True).scalar_subquery()
 
 
 class RentalSession(BaseDbModel):
@@ -102,9 +164,9 @@ class RentalSession(BaseDbModel):
     user_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     user_fullname: Mapped[str | None] = mapped_column(String, nullable=True)
     strike = relationship("Strike", uselist=False, back_populates="session")
-
-    strike = relationship("Strike", uselist=False, back_populates="session")
-    item: Mapped["Item"] = relationship("Item")
+    item: Mapped[Item] = relationship(
+        "Item", back_populates="sessions", primaryjoin="and_(RentalSession.item_id == Item.id, not_(Item.is_deleted))"
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @hybrid_property
