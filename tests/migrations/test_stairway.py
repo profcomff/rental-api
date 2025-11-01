@@ -1,5 +1,7 @@
 import subprocess
+
 import pytest
+
 
 def get_all_revisions():
     result = subprocess.run(["alembic", "history"], stdout=subprocess.PIPE, check=True)
@@ -11,6 +13,7 @@ def get_all_revisions():
             # if rev != "<base>":
             #     revisions.append(rev)
     return list(reversed(revisions))
+
 
 @pytest.mark.parametrize("rev", get_all_revisions())
 def test_stairway_upgrade_downgrade(rev):
