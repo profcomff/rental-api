@@ -10,8 +10,8 @@ def get_all_revisions():
     for line in lines:
         if line and "->" in line:
             rev = line.split("->")[0].strip()
-            # if rev != "<base>":
-            #     revisions.append(rev)
+            if rev != "<base>":
+                revisions.append(rev)
     return list(reversed(revisions))
 
 
