@@ -45,7 +45,11 @@ class Item(BaseDbModel):
     is_available: Mapped[bool] = mapped_column(Boolean, default=False)
     type: Mapped[ItemType] = relationship("ItemType", back_populates="items")
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    sessions: Mapped[list[RentalSession]] = relationship("RentalSession", back_populates="item")
+    sessions: Mapped[list[RentalSession]] = relationship(
+        "RentalSession",
+        back_populates="item",
+        primaryjoin="and_(RentalSession.item_id == Item.id, not_(RentalSession.is_deleted))",
+    )
 
 
 class ItemType(BaseDbModel):
@@ -61,20 +65,20 @@ class ItemType(BaseDbModel):
     @staticmethod
     def get_availability(session, item_type_data: ItemType, user_id: int) -> bool:
         item_type_id = item_type_data.id
-        occupied_stmt = exists().where(
+        occupied_query = exists().where(
             RentalSession.user_id == user_id,
             RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED, RentStatus.OVERDUE]),
             RentalSession.item.has(Item.type_id == item_type_id),
         )
-        available_stmt = exists().where(
+        available_query = exists().where(
             Item.type_id == item_type_id,
             Item.is_available == True,
         )
         is_available_for_user = bool(
             session.query(
                 and_(
-                    not_(occupied_stmt),
-                    available_stmt,
+                    not_(occupied_query),
+                    available_query,
                 )
             ).scalar()
         )
