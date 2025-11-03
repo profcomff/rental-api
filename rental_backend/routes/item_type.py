@@ -38,7 +38,7 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
 
 
 @item_type.get("", response_model=list[ItemTypeGet], dependencies=[Depends(check_sessions_expiration)])
-async def get_items_types(user=Depends(UnionAuth())) -> list[ItemTypeGet]:
+async def get_items_types(user=Depends(UnionAuth(auto_error=False))) -> list[ItemTypeGet]:
     """
     Retrieves a list of all item types.
 
@@ -50,8 +50,9 @@ async def get_items_types(user=Depends(UnionAuth())) -> list[ItemTypeGet]:
     if not item_types_all:
         raise ObjectNotFound(ItemType, 'all')
     item_type_data_map: dict[int, tuple[bool, int]] = ItemType.get_availability_and_count_batch(
-        db.session, item_types_all, user.get("id")
+        db.session, item_types_all, user.get("id") if user else None
     )
+
     result: list[ItemTypeGet] = []
     for item_type in item_types_all:
         item_type: ItemType
