@@ -63,13 +63,36 @@ class ItemType(BaseDbModel):
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @staticmethod
+    def get_availability(session, item_type_data: ItemType, user_id: int | None) -> bool:
+        if user_id is None:
+            return False
+        item_type_id = item_type_data.id
+        occupied_query = exists().where(
+            RentalSession.user_id == user_id,
+            RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED, RentStatus.OVERDUE]),
+            RentalSession.item.has(Item.type_id == item_type_id),
+        )
+        available_query = exists().where(
+            Item.type_id == item_type_id,
+            Item.is_available == True,
+        )
+        is_available_for_user = bool(
+            session.query(
+                and_(
+                    not_(occupied_query),
+                    available_query,
+                )
+            ).scalar()
+        )
+        return is_available_for_user
+
+    @staticmethod
     def get_availability_and_count_batch(
         session, item_type_data: list[ItemType], user_id: int | None
     ) -> dict[int, tuple[bool, int]]:
         item_type_ids = [it.id for it in item_type_data]
         if user_id is None:
             return {item_type_id: (False, 0) for item_type_id in item_type_ids}
-
         available_count_subq = (
             select(Item.type_id.label("type_id"), func.count().label("available_count"))
             .where(Item.is_available == True, Item.is_deleted == False)
@@ -82,7 +105,10 @@ class ItemType(BaseDbModel):
                 case(
                     (
                         and_(
-                            exists().where(Item.type_id == ItemType.id, Item.is_available == True),
+                            exists().where(
+                                Item.type_id == ItemType.id,
+                                Item.is_available == True,
+                            ),
                             not_(
                                 exists().where(
                                     RentalSession.user_id == user_id,
