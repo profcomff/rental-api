@@ -301,7 +301,7 @@ async def accept_end_rental_session(
 async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
 
     rental_session: RentalSession | None = (
-        db.session.query(RentalSession)
+        RentalSession.query(session=db.session)
         .options(joinedload(RentalSession.strike))
         .filter(RentalSession.id == session_id)
         .first()
@@ -347,7 +347,7 @@ async def get_rental_sessions_common(
     if not to_show:  # if everything false by default should show all
         to_show = list(RentStatus)
 
-    query = db_session.query(RentalSession).options(joinedload(RentalSession.strike))
+    query = RentalSession.query(session=db_session).options(joinedload(RentalSession.strike))
     query = query.filter(RentalSession.status.in_(to_show))
 
     if is_admin:
@@ -483,7 +483,7 @@ async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=[
 
     Returns the deleted rental session.
 
-    Raises **ForbiddenAction** if the session is in RESERVED or ACTIVE status.
+    Raises **ForbiddenAction** if the session is in RESERVED, ACTIVE, OVERDUE status.
     Raises **ObjectNotFound** if the session does not exist.
     """
     session = RentalSession.get(id=session_id, session=db.session)
@@ -497,7 +497,7 @@ async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=[
     return StatusResponseModel(
         status="Success",
         message=f"Rental session with id = {session_id} has been deleted",
-        ru="Сессия удалена из RentalAPI",
+        ru=f"Сессия {session_id} удалена из RentalAPI",
     )
 
 
