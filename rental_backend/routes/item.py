@@ -15,6 +15,7 @@ settings: Settings = get_settings()
 item = APIRouter(prefix="/item", tags=["Items"])
 
 
+
 @item.get("", response_model=list[ItemGet])
 async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
     """
