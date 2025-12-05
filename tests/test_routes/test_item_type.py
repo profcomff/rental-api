@@ -79,25 +79,38 @@ def test_update_item_type(client, dbsession, item_n, body, item_type_fixture, re
 
 
 @pytest.mark.parametrize(
-    'item_n,response_status',
+    'item_n,count,response_status,expected_changed,expected_available',
     [
-        # Есть один item available
-        (0, status.HTTP_200_OK),
-        # type_id без items
-        (1, status.HTTP_404_NOT_FOUND),
+        # Есть ItemType с 2 items (1 available, 1 unavailable), count=1 -> совпадает
+        (0, 1, status.HTTP_200_OK, 0, 1),
+        # Есть ItemType с 2 items, count=0 -> нужно сделать всех недоступными
+        (0, 0, status.HTTP_200_OK, 1, 0),
+        # Есть ItemType с 2 items, count=2 -> нужно сделать всех доступными
+        (0, 2, status.HTTP_200_OK, 1, 2),
+        # Есть ItemType с 2 items, count=100 -> максимум доступных = 2
+        (0, 100, status.HTTP_200_OK, 1, 2),
+        # ItemType без items, count=5 -> ничего не меняется
+        (1, 5, status.HTTP_200_OK, 0, 0),
         # Несуществующий type_id
-        (2, status.HTTP_404_NOT_FOUND),
+        (2, 1, status.HTTP_404_NOT_FOUND, None, None),
     ],
 )
-def test_update_item_type_available(client, item_n, items_with_same_type_id, response_status):
+def test_update_item_type_available(
+    client, item_n, count, items_with_same_type_id, response_status, expected_changed, expected_available
+):
     type_id = -100000
     if item_n < len(items_with_same_type_id):
         type_id = items_with_same_type_id[item_n].id
-    response = client.patch(f"{url}/available/{type_id}")
+
+    response = client.patch(f"{url}/available/{type_id}?count={count}")
     assert response.status_code == response_status
+
     if response.status_code == status.HTTP_200_OK:
-        response = client.patch(f"{url}/available/{type_id}")
-        assert response.status_code == status.HTTP_404_NOT_FOUND
+        data = response.json()
+        assert data["items_changed"] == expected_changed
+        assert data["total_available"] == expected_available
+        assert isinstance(data["item_ids"], list)
+        assert len(data["item_ids"]) == expected_changed
 
 
 def test_delete_item_type(client, item_type_fixture):
