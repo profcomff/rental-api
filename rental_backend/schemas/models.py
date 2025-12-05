@@ -14,6 +14,7 @@ class ItemTypeGet(Base):
     description: str | None = None
     available_items_count: int | None = None
     availability: bool = False
+    cool_down_end_ts: datetime.datetime | None = None
 
 
 class ItemTypePost(Base):

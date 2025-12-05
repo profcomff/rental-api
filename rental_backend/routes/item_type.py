@@ -1,3 +1,6 @@
+import datetime
+from collections import defaultdict
+
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends
 from fastapi_sqlalchemy import db
@@ -17,6 +20,47 @@ settings: Settings = get_settings()
 item_type = APIRouter(prefix="/itemtype", tags=["ItemType"])
 
 
+def _calculate_cool_down_end_ts_for_types(
+    item_type_ids: list[int], user_id: int | None
+) -> dict[int, datetime.datetime]:
+    """Return cooldown end timestamps for given item types and user based on rate limiter logic."""
+
+    if not user_id or not item_type_ids:
+        return {}
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    limiter_delta = datetime.timedelta(minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES)
+    cutoff_time = now - limiter_delta
+
+    rate_limit_sessions = (
+        db.session.query(RentalSession.item_type_id, RentalSession.reservation_ts)
+        .filter(
+            RentalSession.user_id == user_id,
+            RentalSession.item_type_id.in_(item_type_ids),
+            RentalSession.status.in_([RentStatus.EXPIRED, RentStatus.CANCELED]),
+            RentalSession.reservation_ts > cutoff_time,
+        )
+        .order_by(RentalSession.item_type_id, RentalSession.reservation_ts)
+        .all()
+    )
+
+    counts: dict[int, int] = defaultdict(int)
+    first_reservation_ts: dict[int, datetime.datetime] = {}
+    cool_down_map: dict[int, datetime.datetime] = {}
+
+    for item_type_id, reservation_ts in rate_limit_sessions:
+        counts[item_type_id] += 1
+        if item_type_id not in first_reservation_ts:
+            first_reservation_ts[item_type_id] = reservation_ts
+
+        if counts[item_type_id] == settings.RENTAL_SESSION_CREATE_NUMBER_LIMITER:
+            ts = first_reservation_ts[item_type_id]
+            ts = ts if ts.tzinfo else ts.replace(tzinfo=datetime.timezone.utc)
+            cool_down_map[item_type_id] = ts + limiter_delta
+
+    return cool_down_map
+
+
 @item_type.get("/{id}", response_model=ItemTypeGet, dependencies=[Depends(check_sessions_expiration)])
 async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
     """
@@ -34,6 +78,8 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
         raise ObjectNotFound(ItemType, id)
     result: ItemTypeGet = ItemTypeGet.model_validate(item_type)
     result.availability = ItemType.get_availability(db.session, item_type, user.get("id"))
+    cool_down_map = _calculate_cool_down_end_ts_for_types([id], user.get("id"))
+    result.cool_down_end_ts = cool_down_map.get(id)
     return result
 
 
@@ -52,6 +98,9 @@ async def get_items_types(user=Depends(UnionAuth(auto_error=False))) -> list[Ite
     item_type_data_map: dict[int, tuple[bool, int]] = ItemType.get_availability_and_count_batch(
         db.session, item_types_all, user.get("id") if user else None
     )
+    cool_down_map = _calculate_cool_down_end_ts_for_types(
+        [item_type.id for item_type in item_types_all], user.get("id") if user else None
+    )
 
     result: list[ItemTypeGet] = []
     for item_type in item_types_all:
@@ -65,6 +114,7 @@ async def get_items_types(user=Depends(UnionAuth(auto_error=False))) -> list[Ite
                 description=item_type.description,
                 available_items_count=item_type_data[1],
                 availability=item_type_data[0],
+                cool_down_end_ts=cool_down_map.get(item_type.id),
             )
         )
     return result
