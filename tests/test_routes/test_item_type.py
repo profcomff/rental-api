@@ -62,8 +62,10 @@ def test_get_item_type_id(client, item_n, item_type_fixture, response_status):
     [
         (0, {"name": True}, status.HTTP_422_UNPROCESSABLE_ENTITY),
         (1, {"name": "TestOK"}, status.HTTP_200_OK),
-        # Non-existent id
+        # Несуществующий id
         (2, {"name": "TestBAD"}, status.HTTP_404_NOT_FOUND),
+        # Некорректный ввод
+        (0, {}, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
 )
 def test_update_item_type(client, dbsession, item_n, body, item_type_fixture, response_status):
@@ -81,15 +83,14 @@ def test_update_item_type(client, dbsession, item_n, body, item_type_fixture, re
 @pytest.mark.parametrize(
     'item_n,count,response_status',
     [
-        # 200_OK as item types are changed
         (0, 1, status.HTTP_200_OK),
         (0, 0, status.HTTP_200_OK),
         (0, 2, status.HTTP_200_OK),
         (0, 100, status.HTTP_200_OK),
         (1, 5, status.HTTP_200_OK),
-        # Non-existent id
+        # Несуществующий id
         (2, 1, status.HTTP_404_NOT_FOUND),
-        # Not correct count
+        # Некорректное число
         (0, -1, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
 )
