@@ -93,9 +93,7 @@ def test_update_item_type(client, dbsession, item_n, body, item_type_fixture, re
         (0, -1, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
 )
-def test_update_item_type_available(
-    client, item_n, count, items_with_same_type_id, response_status
-):
+def test_update_item_type_available(client, item_n, count, items_with_same_type_id, response_status):
     type_id = -100000
     if item_n < len(items_with_same_type_id):
         type_id = items_with_same_type_id[item_n].id
