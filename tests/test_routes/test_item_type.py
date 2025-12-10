@@ -28,15 +28,16 @@ def test_create_item_type(client, item_type_fixture, item_n, response_status):
     assert post_response.status_code == response_status
 
 
-def test_get_item_type(client, item_type_fixture):
-    # 200_OK as any item types are found
+def test_get_item_type_successfully(client, item_type_fixture):
     get_response = client.get(url)
     assert get_response.status_code == status.HTTP_200_OK
+
+def test_get_item_type_unsuccessfully(client, item_type_fixture):
     response = client.delete(f"{url}/{item_type_fixture[0].id}")
     assert response.status_code == status.HTTP_200_OK
     response = client.delete(f"{url}/{item_type_fixture[1].id}")
     assert response.status_code == status.HTTP_200_OK
-    # 404_NOT_FOUND as no item types are found
+    response = client.delete(f"{url}/{item_type_fixture[0].id}")
     get_response = client.get(url)
     assert get_response.status_code == status.HTTP_404_NOT_FOUND
 
@@ -105,14 +106,28 @@ def test_update_item_type_available(client, item_n, count, items_with_same_type_
         assert data["total_available"] == min(count, len(items_with_same_type_id[item_n].items))
 
 
-def test_delete_item_type(client, item_type_fixture):
-    response = client.delete(f"{url}/{item_type_fixture[0].id}")
-    assert response.status_code == status.HTTP_200_OK
-    # checking if items are not deleted
-    assert item_type_fixture[0].items == []
-    # trying to delete deleted
-    response = client.delete(f"{url}/{item_type_fixture[0].id}")
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    # trying to get deleted
-    response = client.get(f'{url}/{item_type_fixture[0].id}')
+@pytest.mark.parametrize(
+    'item_n,response_status',
+    [
+        (0, status.HTTP_200_OK),
+        (1, status.HTTP_200_OK),
+    ],
+)
+def test_delete_item_type(client, item_type_fixture, item_n, response_status):
+    type_id = item_type_fixture[item_n].id
+    response = client.delete(f"{url}/{type_id}")
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        assert client.get(f"{url}/{type_id}").status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_delete_item_type_with_items(client, items_with_same_type_id):
+    type_id = items_with_same_type_id[0].id
+    response = client.delete(f"{url}/{type_id}")
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert client.get(f"{url}/{type_id}").status_code == status.HTTP_200_OK
+
+
+def test_delete_nonexistent_item_type(client, item_type_fixture):
+    response = client.delete(f"{url}/999999")
     assert response.status_code == status.HTTP_404_NOT_FOUND
