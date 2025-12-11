@@ -32,6 +32,7 @@ def test_get_item_type_successfully(client, item_type_fixture):
     get_response = client.get(url)
     assert get_response.status_code == status.HTTP_200_OK
 
+
 def test_get_item_type_unsuccessfully(client, item_type_fixture):
     response = client.delete(f"{url}/{item_type_fixture[0].id}")
     assert response.status_code == status.HTTP_200_OK
@@ -56,6 +57,11 @@ def test_get_item_type_id(client, item_n, item_type_fixture, response_status):
         type_id = item_type_fixture[item_n].id
     response = client.get(f'{url}/{type_id}')
     assert response.status_code == response_status
+
+
+def test_get_item_type_id_invalid(client, item_type_fixture):
+    response = client.get(f'{url}/invalid')
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 @pytest.mark.parametrize(
@@ -131,3 +137,17 @@ def test_delete_item_type_with_items(client, items_with_same_type_id):
 def test_delete_nonexistent_item_type(client, item_type_fixture):
     response = client.delete(f"{url}/999999")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.parametrize(
+    'type_id,response_status',
+    [
+        # Неверный id
+        (999999, status.HTTP_404_NOT_FOUND),
+        # Неверный ввод
+        ("invalid", status.HTTP_422_UNPROCESSABLE_ENTITY),
+    ],
+)
+def test_delete_item_type_errors(client, item_type_fixture, type_id, response_status):
+    response = client.delete(f"{url}/{type_id}")
+    assert response.status_code == response_status
