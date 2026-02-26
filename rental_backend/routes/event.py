@@ -7,6 +7,7 @@ from fastapi_sqlalchemy import db
 from rental_backend.models.db import Event
 from rental_backend.schemas.models import EventGet
 
+
 event = APIRouter(prefix="/event", tags=["Event"])
 
 
