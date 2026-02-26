@@ -5,7 +5,6 @@ from starlette import status
 
 from rental_backend.settings import get_settings
 
-
 logger = logging.getLogger(__name__)
 url: str = '/itemtype'
 
