@@ -113,7 +113,8 @@ async def delete_item(
         raise ObjectNotFound(Item, id)
     Item.delete(id, session=db.session)
     for rental_session in rental_sessions:
-        RentalSession.delete(rental_session.id, session=db.session)
+        if not rental_session.is_deleted:
+            RentalSession.delete(rental_session.id, session=db.session)
         strikes = db.session.query(Strike).filter(Strike.session_id == rental_session.id)
         for strike in strikes:
             Strike.delete(strike.id, session=db.session)
