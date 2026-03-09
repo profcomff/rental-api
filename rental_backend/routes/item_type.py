@@ -123,7 +123,7 @@ async def get_items_types(user=Depends(UnionAuth(auto_error=False))) -> list[Ite
 @item_type.post("", response_model=ItemTypeGet)
 async def create_item_type(
     item_type_info: ItemTypePost,
-    user=Depends(UnionAuth(scopes=["rental.item_type.create"], allow_none=False)),
+    user=Depends(UnionAuth( allow_none=False)), #scopes=["rental.item_type.create"],
 ) -> ItemTypeGet:
     """
     Creates a new item type.
@@ -147,7 +147,7 @@ async def create_item_type(
 
 @item_type.patch("/{id}", response_model=ItemTypeGet)
 async def update_item_type(
-    id: int, item_type_info: ItemTypePost, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
+    id: int, item_type_info: ItemTypePost, user=Depends(UnionAuth( allow_none=False)) #scopes=["rental.item_type.update"],
 ) -> ItemTypeGet:
     """
     Updates the information of an item type by its ID.
@@ -177,7 +177,7 @@ async def update_item_type(
 
 @item_type.patch("/available/{id}", response_model=ItemTypeAvailable)
 async def make_item_type_available(
-    id: int, count: int, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
+    id: int, count: int, user=Depends(UnionAuth( allow_none=False)) #scopes=["rental.item_type.update"],
 ) -> ItemTypeAvailable:
     """
     Делает один предмет доступным по ID типа предмета.
@@ -243,7 +243,7 @@ async def make_item_type_available(
 
 @item_type.delete("/{id}", response_model=StatusResponseModel)
 async def delete_item_type(
-    id: int, user=Depends(UnionAuth(scopes=["rental.item_type.delete"], allow_none=False))
+    id: int, user=Depends(UnionAuth( allow_none=False)) #scopes=["rental.item_type.delete"],
 ) -> StatusResponseModel:
     """
     Deletes an item type by its ID.

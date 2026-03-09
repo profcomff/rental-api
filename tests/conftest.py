@@ -83,35 +83,44 @@ def db_container(get_settings_mock):
 
 @pytest.fixture
 def authlib_user():
-    """Данные о пользователе, возвращаемые сервисом auth.
+    """Данные о пользователе-администраторе, возвращаемые сервисом auth.
 
     Составлено на основе: https://clck.ru/3LWzxt
     """
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
-        "user_scopes": [{"id": 0, "name": "string"}],
+        #"user_scopes": [{"id": 0, "name": "string"}],
+        "user_scopes": [{"id": 1, "name": "rental.session.admin"}],  # добавлен нужный скоуп "rental.session.admin" (по сути сейчас эта строка ничего не делает, но как в UnionAuth)
+        "scopes": ["rental.session.admin"],  # добавлено для корректной работы прав в тесте test_admin_can_update_any_rental_session
         "indirect_groups": [0],
         "groups": [0],
         "id": 0,
         "email": "string",
+        "userdata": [
+            # {"param": "string", "value": "string"}
+            {"param": "Полное имя", "value": "Тестов Тест"},
+            {"param": "Номер телефона", "value": "+79991234567"}
+        ],
     }
 
 
 @pytest.fixture
 def another_authlib_user():
-    """Данные об еще одном пользователе, возвращаемые сервисом auth.
+    """Данные об еще одном обычном пользователе (без прав администратора), возвращаемые сервисом auth.
 
     Составлено на основе: https://clck.ru/3LWzxt
     """
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
-        "user_scopes": [{"id": 0, "name": "string"}],
+        "user_scopes": [],
+        "scopes": [],  # пустой список
         "indirect_groups": [0],
         "groups": [0],
         "id": 1,
         "email": "string",
+        "userdata": [],
     }
 
 
@@ -138,7 +147,7 @@ def another_user_mock(authlib_mock, another_authlib_user):
 
 @pytest.fixture
 def client(user_mock):
-    client = TestClient(app, raise_server_exceptions=False)
+    client = TestClient(app, raise_server_exceptions=True)
     return client
 
 
@@ -268,6 +277,7 @@ def items_with_same_type_id(dbsession):
 
     .. note::
         Фикстура создает три item одного item_type: последний с флагом is_available=False
+        Очистка производится в dbsession.
     """
     item_types = [ItemType(name="testingtype1"), ItemType(name="testingtype2")]
     for item_type in item_types:
@@ -282,12 +292,6 @@ def items_with_same_type_id(dbsession):
         dbsession.add(i)
     dbsession.commit()
     yield item_types
-    for i in item_types:
-        for item in i.items:
-            dbsession.delete(item)
-        dbsession.flush()
-        dbsession.delete(i)
-    dbsession.commit()
 
 
 @pytest.fixture
@@ -302,8 +306,8 @@ def items_with_same_type(dbsession, item_types) -> List[Item]:
 
 @pytest.fixture()
 def expire_mock(mocker):
-    """Mock-объект для функции check_session_expiration."""
-    fake_check = mocker.patch('rental_backend.routes.rental_session.check_session_expiration')
+    """Mock-объект для функции check_sessions_expiration."""
+    fake_check = mocker.patch('rental_backend.routes.rental_session.check_sessions_expiration')
     fake_check.return_value = True
     return fake_check
 
@@ -346,7 +350,9 @@ def another_rentses(dbsession, items_with_same_type, another_authlib_user) -> Re
         item_id=renting_item.id,
         status=RentStatus.RESERVED,
     )
-    Item.update(id=renting_item.id, session=dbsession, is_available=False)
+    #Item.update(id=renting_item.id, session=dbsession, is_available=False)
+    # Устанавливаем предмет недоступным напрямую (без update, чтобы избежать AlreadyExists)
+    renting_item.is_available = False
     dbsession.add(rent)
     dbsession.commit()
     return rent

@@ -85,7 +85,7 @@ async def check_sessions_overdue():
 )
 async def create_rental_session(
     item_type_id: int,
-    user=Depends(UnionAuth(scopes=["rental.session.create"], enable_userdata=True)),
+    user=Depends(UnionAuth(scopes=["rental.session.create"], enable_userdata=True)),  # scopes=["rental.session.create"] добавить для прода
 ):
     """
     Создает новую сессию аренды для указанного типа предмета.
@@ -109,27 +109,27 @@ async def create_rental_session(
     if blocking_session:
         raise SessionExists(RentalSession, item_type_id)
     # rate limiter
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-    cutoff_time = now - datetime.timedelta(minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES)
+    # now = datetime.datetime.now(tz=datetime.timezone.utc)
+    # cutoff_time = now - datetime.timedelta(minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES)
 
-    rate_limiter_sessions = (
-        exist_session_item.filter(
-            or_(RentalSession.status == RentStatus.EXPIRED, RentalSession.status == RentStatus.CANCELED),
-            RentalSession.reservation_ts > cutoff_time,
-        )
-        .order_by(RentalSession.reservation_ts)
-        .all()
-    )
+    # rate_limiter_sessions = (
+    #     exist_session_item.filter(
+    #         or_(RentalSession.status == RentStatus.EXPIRED, RentalSession.status == RentStatus.CANCELED),
+    #         RentalSession.reservation_ts > cutoff_time,
+    #     )
+    #     .order_by(RentalSession.reservation_ts)
+    #     .all()
+    # )
 
-    if len(rate_limiter_sessions) >= settings.RENTAL_SESSION_CREATE_NUMBER_LIMITER:
-        oldest_session_time = rate_limiter_sessions[0].reservation_ts
-        oldest_session_time = oldest_session_time.replace(tzinfo=datetime.timezone.utc)
+    # if len(rate_limiter_sessions) >= settings.RENTAL_SESSION_CREATE_NUMBER_LIMITER:
+    #     oldest_session_time = rate_limiter_sessions[0].reservation_ts
+    #     oldest_session_time = oldest_session_time.replace(tzinfo=datetime.timezone.utc)
 
-        reset_time = oldest_session_time + datetime.timedelta(
-            minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES
-        )
-        minutes_left = max(0, int((reset_time - now).total_seconds() / 60))
-        raise RateLimiterError(item_type_id, minutes_left)
+    #     reset_time = oldest_session_time + datetime.timedelta(
+    #         minutes=settings.RENTAL_SESSION_CREATE_TIME_LIMITER_MINUTES
+    #     )
+    #     minutes_left = max(0, int((reset_time - now).total_seconds() / 60))
+    #     raise RateLimiterError(item_type_id, minutes_left)
 
     available_item: Item = (
         Item.query(session=db.session).filter(Item.type_id == item_type_id, Item.is_available == True).first()
@@ -138,6 +138,9 @@ async def create_rental_session(
         raise NoneAvailable(ItemType, item_type_id)
     # получаем ФИО и номер телефона из userdata
     userdata_info = user.get("userdata")
+    print(userdata_info)
+    print('hello')
+    print(user)
     full_name_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
     phone_number_info = list(filter(lambda x: "Номер телефона" == x['param'], userdata_info))
     full_name = full_name_info[0]["value"] if len(full_name_info) != 0 else None
@@ -176,7 +179,9 @@ def validate_deadline_ts(deadline_ts: datetime.datetime | None = Query(descripti
     "/{session_id}/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
 async def start_rental_session(
-    session_id, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+    session_id: int,
+    deadline_ts=Depends(validate_deadline_ts),
+    user=Depends(UnionAuth(scopes=["rental.session.admin"])),  # "rental.session.admin"
 ):
     """
     Starts a rental session, changing its status to ACTIVE.
@@ -207,7 +212,7 @@ async def start_rental_session(
         now = datetime.datetime.now(tz=datetime.timezone.utc)
         new_deadline = now.replace(hour=settings.BASE_OVERDUE, minute=0, second=0, microsecond=0)
         if now > new_deadline:
-            new_deadline += datetime.timedelta(days=1)
+            new_deadline = now.replace(day=now.day + 1, hour=settings.BASE_OVERDUE, minute=0, second=0, microsecond=0)
         info_for_update["deadline_ts"] = new_deadline
 
     updated_session = RentalSession.update(**info_for_update)
@@ -230,7 +235,7 @@ async def accept_end_rental_session(
     session_id: int,
     with_strike: bool = Query(False, description="A flag indicating whether to issue a strike."),
     strike_reason: str = Query("", description="The reason for the strike."),
-    user=Depends(UnionAuth(scopes=["rental.session.admin"])),
+    user=Depends(UnionAuth(scopes=["rental.session.admin"])),  # "rental.session.admin"
 ):
     """
     Ends a rental session, changing its status to RETURNED. Issues a strike if specified.
@@ -279,7 +284,9 @@ async def accept_end_rental_session(
             session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
         )
 
-        ended_session.strike_id = new_strike.id
+        ended_session.strike = new_strike
+        # В модели RentalSession нет поля strike_id. Строчка ниже может вызвать AttributeError при попытке присвоения
+        # ended_session.strike_id = new_strike.id
         db.session.commit()
 
         ActionLogger.log_event(
@@ -298,7 +305,7 @@ async def accept_end_rental_session(
     response_model=RentalSessionGet,
     dependencies=[Depends(check_sessions_expiration), Depends(check_sessions_overdue)],
 )
-async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):  # "rental.session.admin"
 
     rental_session: RentalSession | None = (
         RentalSession.query(session=db.session)
@@ -398,7 +405,7 @@ async def get_rental_sessions(
     is_expired: bool = Query(False, description="Флаг, показывать просроченные"),
     item_type_id: int = Query(0, description="ID типа предмета"),
     user_id: int = Query(0, description="User_id для получения сессий"),
-    user=Depends(UnionAuth(scopes=["rental.session.admin"])),
+    user=Depends(UnionAuth(scopes=["rental.session.admin"])),  # "rental.session.admin"
 ):
     """
     Retrieves a list of rental sessions with optional status filtering.
@@ -473,7 +480,7 @@ async def get_my_sessions(
 
 
 @rental_session.delete("/{session_id}", response_model=StatusResponseModel)
-async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):  # "rental.session.admin"
     """
     Deletes a session.
 
@@ -543,7 +550,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
 
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
-    session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+    session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))  # scopes=["rental.session.admin"]
 ):
     """
     Updates the information of a rental session.

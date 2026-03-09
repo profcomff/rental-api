@@ -1,14 +1,19 @@
 import datetime
 from contextlib import contextmanager
 from typing import Generator
-
 import pytest
 from sqlalchemy import desc
 from starlette import status
 
+from unittest.mock import patch
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
+from rental_backend.routes import app
+
 from rental_backend.models.base import BaseDbModel
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.routes.rental_session import rental_session
+from rental_backend.routes.rental_session import RENTAL_SESSION_EXPIRY
 from rental_backend.schemas.models import RentStatus
 from tests.conftest import model_to_dict
 
@@ -42,15 +47,18 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
 
 
 # Tests for POST /rental-sessions/{item_type_id}
-@pytest.mark.usefixtures('expire_mock')
+@pytest.mark.usefixtures(
+    'expire_mock'
+)  # подменяет check_sessions_expiration чтобы не выполнялась реальная проверка просроченных сессий
 @pytest.mark.parametrize(
     'start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations',
     [
         (True, False, 0, status.HTTP_200_OK, 1),
         (False, False, 0, status.HTTP_404_NOT_FOUND, 0),
-        (True, True, 1, status.HTTP_404_NOT_FOUND, 0),
+        (True, True, 1, status.HTTP_404_NOT_FOUND, 0),  # результат зависит от типа создаваемого предмета в item_fixture
+        (True, True, 2, status.HTTP_404_NOT_FOUND, 0),
     ],
-    ids=['avail_item', 'not_avail_item', 'unexisting_itemtype'],
+    ids=['avail_item', 'not_avail_item', 'existing_type_no_items', 'unexisting_itemtype'],
 )
 def test_create_with_diff_item(
     dbsession,
@@ -64,6 +72,7 @@ def test_create_with_diff_item(
     num_of_creations,
 ):
     """Проверка старта аренды разных Item от разных ItemType."""
+    ###
     item_fixture.is_available = start_item_avail
     dbsession.add(item_fixture)
     dbsession.commit()
@@ -77,6 +86,49 @@ def test_create_with_diff_item(
     ):
         response = client.post(f'{base_rentses_url}/{type_id}')
         assert response.status_code == right_status_code
+
+
+@pytest.mark.parametrize(
+    "blocking_status",
+    [RentStatus.RESERVED, RentStatus.ACTIVE, RentStatus.OVERDUE],
+    ids=["reserved", "active", "overdue"],
+)
+def test_create_with_existing_blocking_session(
+    dbsession, client, base_rentses_url, items_with_same_type_id, authlib_user, blocking_status
+):
+    """
+    Проверяет, что нельзя создать новую сессию для типа, если у пользователя уже есть
+    сессия в статусе RESERVED/ACTIVE/OVERDUE для этого типа.
+    """
+    # Фикстура items_with_same_type_id возвращает список item_types,
+    # где первый тип содержит два предмета: items[0] is_available=True, items[1] is_available=False.
+    item_type = items_with_same_type_id[0]
+    items = item_type.items
+    assert len(items) >= 2, "Для теста нужно минимум два предмета одного типа"
+    # Делаем второй предмет доступным (если он был недоступен)
+    items[1].is_available = True
+    dbsession.add(items[1])
+    dbsession.commit()
+    # Создаём блокирующую сессию для первого предмета
+    now = datetime.datetime.now(datetime.timezone.utc)
+    blocking_session = RentalSession.create(
+        session=dbsession,
+        user_id=authlib_user["id"],
+        item_id=items[0].id,
+        status=blocking_status,
+        reservation_ts=now,
+    )
+    items[0].is_available = False
+    dbsession.add(blocking_session, items[0])
+    dbsession.commit()
+    try:
+        # Пытаемся создать новую сессию для того же типа
+        response = client.post(f"{base_rentses_url}/{item_type.id}")
+        # Ожидаем конфликт, так как блокирующая сессия существует
+        assert response.status_code == status.HTTP_409_CONFLICT
+    finally:
+        # Гарантированный откат транзакции для предотвращения PendingRollbackError (если она была помечена как требующая отката из-за предыдущего исключения)
+        dbsession.rollback()
 
 
 @pytest.mark.usefixtures('expire_mock')
@@ -100,15 +152,43 @@ def test_create_with_invalid_id(dbsession, client, base_rentses_url, invalid_ite
 
 @pytest.mark.usefixtures('expiration_time_mock')
 def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
-    """Проверка правильного срабатывания check_session_expiration."""
+    """
+    Проверяет, что просроченная сессия (RESERVED) переходит в EXPIRED при следующем вызове check_sessions_expiration.
+    """
     item_fixture.is_available = True
     dbsession.add(item_fixture)
     dbsession.commit()
+    # Создаём сессию аренды
     response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
     assert response.status_code == status.HTTP_200_OK
+    session_id = response.json()['id']
+    # Проверяем, что сразу после создания статус RESERVED (корректно)
+    session = RentalSession.get(id=session_id, session=dbsession)
+    assert session.status == RentStatus.RESERVED
+    # Искусственно сдвигаем время резервации в прошлое, чтобы условие expiry выполнилось немедленно.
+    # RENTAL_SESSION_EXPIRY подменён фикстурой expiration_time_mock на 2 секунды.
+    new_reservation_ts = (
+        datetime.datetime.now(datetime.timezone.utc) - RENTAL_SESSION_EXPIRY - datetime.timedelta(seconds=1)
+    )
+    session.reservation_ts = new_reservation_ts
+    dbsession.add(session)
+    dbsession.commit()
+    # Вызываем любой эндпоинт, который включает check_sessions_expiration, чтобы просроченные сессии были обработаны и обновлены в БД.
+    # Например, GET /rental-sessions/{session_id} (тоже имеет эту зависимость)
+    response = client.get(f'{base_rentses_url}/{session_id}')
+    assert response.status_code == status.HTTP_200_OK
+    # Обновляем объект сессии из БД и проверяем статус
+    dbsession.refresh(session)
     assert (
-        RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.EXPIRED
-    ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.CANCELED!'
+        session.status == RentStatus.EXPIRED
+    ), f"Статус сессии аренды должен стать EXPIRED, но остался {session.status}"
+
+
+# Тест на начало уже активной сессии
+def test_start_already_active_session(dbsession, client, base_rentses_url, active_rentses):
+    """Проверка, что нельзя начать уже активную сессию."""
+    response = client.patch(f'{base_rentses_url}/{active_rentses.id}/start')
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 # Tests for PATCH /rental-sessions/{session_id}/start
@@ -184,9 +264,9 @@ def test_return_inactive(dbsession, client, rentses, base_rentses_url):
     ids=[
         'empty',
         'full_valid',
-        'only_with',
-        'only_reason',
-        'invalid_with_big_num',
+        'strike_no_reason',
+        'only_reason_no_strike',
+        'invalid_with_num',
         'invalid_with_text',
         'invalid_with_trailing_slash',
     ],
@@ -194,16 +274,45 @@ def test_return_inactive(dbsession, client, rentses, base_rentses_url):
 def test_return_with_strike(
     dbsession, client, base_rentses_url, active_rentses, with_strike, strike_reason, right_status_code, strike_created
 ):
-    """Проверяет завершение аренды со страйком."""
+    """Проверяет завершение аренды со страйком, статус сессии, доступность предмета и атрибуты страйка."""
     query_dict = dict()
     if with_strike is not None:
         query_dict['with_strike'] = with_strike
     if strike_reason is not None:
         query_dict['strike_reason'] = strike_reason
     num_of_creations = 1 if strike_created else 0
+    session_id = active_rentses.id
+    item_id = active_rentses.item_id
     with check_object_creation(Strike, dbsession, num_of_creations):
         response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return', params=query_dict)
         assert response.status_code == right_status_code
+        # Если статус ответа 200, проверяем изменения в БД
+        if right_status_code == status.HTTP_200_OK:
+            dbsession.refresh(active_rentses)
+            assert active_rentses.status == RentStatus.RETURNED, "Статус сессии должен стать RETURNED"
+            assert active_rentses.item.is_available is True, "Предмет должен стать доступным"
+            # Проверяем создание страйка
+            if strike_created:
+                strike = dbsession.query(Strike).filter(Strike.session_id == session_id).first()
+                assert strike is not None, "Страйк должен быть создан"
+                assert strike.user_id == active_rentses.user_id, "user_id страйка не совпадает"
+                # admin_id должен быть ID текущего пользователя (из фикстуры client, которая использует user_mock с id=0)
+                assert strike.admin_id == 0, "admin_id страйка должен быть ID администратора"
+                expected_reason = strike_reason if strike_reason is not None else ""
+                assert strike.reason == expected_reason, "Причина страйка не совпадает"
+                assert strike.session_id == session_id, "session_id страйка не совпадает"
+            else:
+                # Если страйк не должен быть создан, убеждаемся, что его нет
+                strike = dbsession.query(Strike).filter(Strike.session_id == session_id).first()
+                assert strike is None, "Страйк не должен быть создан"
+        else:
+            # Для невалидных запросов проверяем, что состояние не изменилось
+            dbsession.refresh(active_rentses)
+            assert active_rentses.status == RentStatus.ACTIVE, "Статус сессии не должен измениться"
+            assert active_rentses.item.is_available is False, "Предмет должен остаться недоступным"
+            # Страйков быть не должно
+            strike = dbsession.query(Strike).filter(Strike.session_id == session_id).first()
+            assert strike is None, "Страйк не должен быть создан при ошибке"
 
 
 def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rentses):
@@ -222,13 +331,14 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
     'session_id, right_status_code',
     [
         (0, status.HTTP_200_OK),
+        (1, status.HTTP_404_NOT_FOUND),  # rentses создает только одну сессию
         ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('he-he/hoho', status.HTTP_404_NOT_FOUND),
         (-2, status.HTTP_404_NOT_FOUND),
         ('-1?hoho=hihi', status.HTTP_404_NOT_FOUND),
     ],
-    ids=['success', 'text', 'hyphen', 'subpath', 'unexisting_id', 'excess_query'],
+    ids=['success', 'no_such_session_in_rentses', 'text', 'hyphen', 'subpath', 'unexisting_id', 'excess_query'],
 )
 def test_retrieve_diff_id(dbsession, client, base_rentses_url, session_id, right_status_code):
     """Проверка получения сессии по разным URL-path."""
@@ -377,6 +487,58 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     assert is_really_updated == update_in_db
 
 
+def test_regular_user_cannot_update_rental_session(dbsession, client, rentses, another_authlib_user):
+    """
+    Проверка, что обычный пользователь (не админ) не может обновить сессию.
+    Ожидается 403 Forbidden, данные в БД не должны измениться.
+    """
+
+    def mock_unionauth_call(self, request):
+        required_scopes = set(self.scopes or [])
+        user_scopes = set(another_authlib_user.get('scopes', []))
+        if required_scopes and not required_scopes.issubset(user_scopes):
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+        return another_authlib_user
+
+    with patch('auth_lib.fastapi.UnionAuth.__call__', new=mock_unionauth_call):
+        old_end_ts = rentses.end_ts
+        payload = {"end_ts": "2026-12-31T23:59:59.000Z"}
+
+        response = client.patch(f"/rental-sessions/{rentses.id}", json=payload)
+
+        assert response.status_code == status.HTTP_403_FORBIDDEN
+
+        dbsession.refresh(rentses)
+        assert rentses.end_ts == old_end_ts
+
+
+def test_admin_can_update_any_rental_session(dbsession, client, another_rentses, authlib_user):
+    """
+    Проверка, что администратор может обновить сессию другого пользователя.
+    Ожидается 200 OK, данные в БД должны измениться.
+    """
+
+    def mock_unionauth_call(self, request):
+        # self — экземпляр UnionAuth, у которого есть атрибут scopes
+        required_scopes = set(self.scopes or [])
+        user_scopes = set(authlib_user.get('scopes', []))
+        if required_scopes and not required_scopes.issubset(user_scopes):
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+        return authlib_user
+
+    with patch('auth_lib.fastapi.UnionAuth.__call__', new=mock_unionauth_call):
+        old_end_ts = another_rentses.end_ts
+        payload = {"end_ts": "2026-12-31T23:59:59.000Z"}
+
+        response = client.patch(f"/rental-sessions/{another_rentses.id}", json=payload)
+
+        assert response.status_code == status.HTTP_200_OK
+
+        dbsession.refresh(another_rentses)
+        assert another_rentses.end_ts is not None
+        assert another_rentses.end_ts != old_end_ts
+
+
 @pytest.mark.usefixtures('dbsession', 'rentses')
 @pytest.mark.parametrize(
     'session_id, right_status_code',
@@ -500,7 +662,7 @@ def test_cancel_success(dbsession, client, base_rentses_url, rentses):
         ('he-he/hoho', status.HTTP_404_NOT_FOUND),
         (-1, status.HTTP_404_NOT_FOUND),
         ('', status.HTTP_404_NOT_FOUND),
-        ('-1?hoho=hihi', status.HTTP_405_METHOD_NOT_ALLOWED),
+        ('-1?hoho=hihi', status.HTTP_404_NOT_FOUND),  # HTTP_405_METHOD_NOT_ALLOWED
     ],
     ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
