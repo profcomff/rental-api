@@ -5,7 +5,8 @@ from typing import Generator
 import pytest
 from sqlalchemy import desc
 from starlette import status
-
+from unittest.mock import patch
+from fastapi import HTTPException
 from rental_backend.models.base import BaseDbModel
 from rental_backend.models.db import Item, ItemType, RentalSession, Strike
 from rental_backend.routes.rental_session import rental_session
@@ -42,40 +43,8 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
 
 
 # Tests for POST /rental-sessions/{item_type_id}
-<<<<<<< Updated upstream
-@pytest.mark.usefixtures('expire_mock')
-@pytest.mark.parametrize(
-    'start_item_avail, end_item_avail, itemtype_list_ind, right_status_code, num_of_creations',
-    [
-        (True, False, 0, status.HTTP_200_OK, 1),
-        (False, False, 0, status.HTTP_404_NOT_FOUND, 0),
-        (True, True, 1, status.HTTP_404_NOT_FOUND, 0),
-    ],
-    ids=['avail_item', 'not_avail_item', 'unexisting_itemtype'],
-)
-def test_create_with_diff_item(
-    dbsession,
-    client,
-    item_fixture,
-    base_rentses_url,
-    start_item_avail,
-    end_item_avail,
-    itemtype_list_ind,
-    right_status_code,
-    num_of_creations,
-):
-    """Проверка старта аренды разных Item от разных ItemType."""
-    item_fixture.is_available = start_item_avail
-    dbsession.add(item_fixture)
-    dbsession.commit()
-    try:
-        type_id = ItemType.query(session=dbsession).all()[itemtype_list_ind].id
-    except IndexError:
-        type_id = ItemType.query(session=dbsession).order_by(desc('id'))[0].id + 1
-=======
 def test_create_with_available_item(dbsession, client, base_rentses_url, available_item):
     """Тест на успешное создание сессии при доступном предмете."""
->>>>>>> Stashed changes
     with (
         check_object_creation(RentalSession, dbsession, num_of_creations=1),
         check_object_update(available_item, dbsession, is_available=False)
@@ -102,8 +71,6 @@ def test_create_with_type_no_items(dbsession, client, base_rentses_url, item_typ
         assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-<<<<<<< Updated upstream
-=======
 def test_create_with_nonexistent_type(dbsession, client, base_rentses_url, nonexistent_type_id):
     """Тест на создание сессии при несуществующем типе предмета."""
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
@@ -119,7 +86,6 @@ def test_create_with_existing_blocking_session(client, base_rentses_url, blockin
     response = client.post(f"{base_rentses_url}/{blocking_session.id}")
     assert response.status_code == status.HTTP_409_CONFLICT
 
->>>>>>> Stashed changes
 @pytest.mark.usefixtures('expire_mock')
 @pytest.mark.parametrize(
     'invalid_itemtype_id, right_status_code',
@@ -140,18 +106,6 @@ def test_create_with_invalid_id(dbsession, client, base_rentses_url, invalid_ite
 
 
 @pytest.mark.usefixtures('expiration_time_mock')
-<<<<<<< Updated upstream
-def test_create_and_expire(dbsession, client, base_rentses_url, item_fixture):
-    """Проверка правильного срабатывания check_session_expiration."""
-    item_fixture.is_available = True
-    dbsession.add(item_fixture)
-    dbsession.commit()
-    response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
-    assert response.status_code == status.HTTP_200_OK
-    assert (
-        RentalSession.get(id=response.json()['id'], session=dbsession).status == RentStatus.EXPIRED
-    ), 'Убедитесь, что по истечение RENTAL_SESSION_EXPIRY, аренда переходит в RentStatus.CANCELED!'
-=======
 def test_create_and_expire(client, base_rentses_url, expired_reserved_session):
     """
     Проверяет, что просроченная сессия (RESERVED) переходит в EXPIRED при следующем вызове check_sessions_expiration.
@@ -167,7 +121,6 @@ def test_start_already_active_session(dbsession, client, base_rentses_url, activ
     """Проверка, что нельзя начать уже активную сессию."""
     response = client.patch(f'{base_rentses_url}/{active_rentses.id}/start')
     assert response.status_code == status.HTTP_403_FORBIDDEN
->>>>>>> Stashed changes
 
 
 # Tests for PATCH /rental-sessions/{session_id}/start
@@ -260,11 +213,6 @@ def test_return_with_strike(
     if strike_reason is not None:
         query_dict['strike_reason'] = strike_reason
     num_of_creations = 1 if strike_created else 0
-<<<<<<< Updated upstream
-    with check_object_creation(Strike, dbsession, num_of_creations):
-        response = client.patch(f'{base_rentses_url}/{active_rentses.id}/return', params=query_dict)
-        assert response.status_code == right_status_code
-=======
     session_id = active_rentses.id
     admin_id = authlib_user["id"]
     with check_object_creation(Strike, dbsession, num_of_creations):
@@ -288,7 +236,6 @@ def test_return_with_strike(
         assert active_rentses.status == RentStatus.ACTIVE
         assert active_rentses.item.is_available is False
         assert active_rentses.strike is None
->>>>>>> Stashed changes
 
 
 def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rentses_with_end_ts):
@@ -304,10 +251,7 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
     'session_id, right_status_code',
     [
         (0, status.HTTP_200_OK),
-<<<<<<< Updated upstream
-=======
-        (1, status.HTTP_404_NOT_FOUND),  
->>>>>>> Stashed changes
+        #(1, status.HTTP_404_NOT_FOUND),  
         ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('he-he/hoho', status.HTTP_404_NOT_FOUND),
@@ -463,8 +407,6 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     assert is_really_updated == update_in_db
 
 
-<<<<<<< Updated upstream
-=======
 def test_regular_user_cannot_update_rental_session(dbsession, client, rentses, another_authlib_user):
     """
     Проверка, что обычный пользователь (не админ) не может обновить сессию.
@@ -508,7 +450,6 @@ def test_admin_can_update_any_rental_session(dbsession, client, another_rentses,
             assert response.status_code == status.HTTP_200_OK
 
 
->>>>>>> Stashed changes
 @pytest.mark.usefixtures('dbsession', 'rentses')
 @pytest.mark.parametrize(
     'session_id, right_status_code',
@@ -632,11 +573,7 @@ def test_cancel_success(dbsession, client, base_rentses_url, rentses):
         ('he-he/hoho', status.HTTP_404_NOT_FOUND),
         (-1, status.HTTP_404_NOT_FOUND),
         ('', status.HTTP_404_NOT_FOUND),
-<<<<<<< Updated upstream
-        ('-1?hoho=hihi', status.HTTP_405_METHOD_NOT_ALLOWED),
-=======
         ('-1?hoho=hihi', status.HTTP_404_NOT_FOUND),
->>>>>>> Stashed changes
     ],
     ids=['text', 'hyphen', 'trailing_slash', 'negative_num', 'empty', 'excess_query'],
 )
