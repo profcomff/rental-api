@@ -4,18 +4,21 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
 
+import datetime
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
 from rental_backend.models.db import *
 from rental_backend.routes import app
 from rental_backend.settings import Settings, get_settings
+from rental_backend.schemas.models import RentStatus
+from rental_backend.routes.rental_session import RENTAL_SESSION_EXPIRY
 
 
 class PostgresConfig:
@@ -90,11 +93,23 @@ def authlib_user():
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
+<<<<<<< Updated upstream
         "user_scopes": [{"id": 0, "name": "string"}],
+=======
+        "user_scopes": [{"id": 1, "name": "rental.session.admin"}],  # добавлен нужный скоуп "rental.session.admin" (по сути сейчас эта строка ничего не делает, но как в UnionAuth)
+        "scopes": ["rental.session.admin"],  # добавлено для корректной работы прав в тесте test_admin_can_update_any_rental_session
+>>>>>>> Stashed changes
         "indirect_groups": [0],
         "groups": [0],
         "id": 0,
         "email": "string",
+<<<<<<< Updated upstream
+=======
+        "userdata": [
+            {"param": "Полное имя", "value": "Тестов Тест"},
+            {"param": "Номер телефона", "value": "+79991234567"}
+        ],
+>>>>>>> Stashed changes
     }
 
 
@@ -107,7 +122,12 @@ def another_authlib_user():
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
+<<<<<<< Updated upstream
         "user_scopes": [{"id": 0, "name": "string"}],
+=======
+        "user_scopes": [],
+        "scopes": [], 
+>>>>>>> Stashed changes
         "indirect_groups": [0],
         "groups": [0],
         "id": 1,
@@ -228,6 +248,19 @@ def item_fixture(dbsession, item_type_fixture):
     dbsession.commit()
     return item
 
+@pytest.fixture
+def available_item(dbsession, item_type_fixture):
+    """Создаёт доступный предмет для первого типа."""
+    item = Item(type_id=item_type_fixture[0].id, is_available=True)
+    dbsession.add(item)
+    dbsession.commit()
+    return item
+
+@pytest.fixture
+def nonexistent_type_id(dbsession):
+    """Возвращает заведомо несуществующий ID типа предмета. (для тестов при создании сессий)"""
+    max_id = dbsession.query(func.max(ItemType.id)).scalar() or 0
+    return max_id + 1
 
 @pytest.fixture()
 def items_with_types(dbsession):
@@ -289,6 +322,37 @@ def items_with_same_type_id(dbsession):
         dbsession.delete(i)
     dbsession.commit()
 
+@pytest.fixture
+def two_available_items_same_type(dbsession, item_types):
+    """
+    Создаёт для два доступных предмета к первому типу из item_types и возвращает тип.
+    """
+    item_type = item_types[0]
+    items = [
+        Item(type_id=item_type.id, is_available=True),
+        Item(type_id=item_type.id, is_available=True),
+    ]
+    dbsession.add_all(items)
+    dbsession.commit()
+    return item_type
+
+@pytest.fixture(params=[RentStatus.RESERVED, RentStatus.ACTIVE, RentStatus.OVERDUE])
+def blocking_session(request, dbsession, two_available_items_same_type, authlib_user):
+    """Создаёт сессию для первого предмета типа с заданным статусом."""
+    item_type = two_available_items_same_type
+    items = item_type.items
+    now = datetime.datetime.now(datetime.timezone.utc)
+    session = RentalSession.create(
+        session=dbsession,
+        user_id=authlib_user["id"],
+        item_id=items[0].id,
+        status=request.param,
+        reservation_ts=now,
+    )
+    items[0].is_available = False
+    dbsession.add(session, items[0])
+    dbsession.commit()
+    return item_type  
 
 @pytest.fixture
 def items_with_same_type(dbsession, item_types) -> List[Item]:
@@ -346,7 +410,11 @@ def another_rentses(dbsession, items_with_same_type, another_authlib_user) -> Re
         item_id=renting_item.id,
         status=RentStatus.RESERVED,
     )
+<<<<<<< Updated upstream
     Item.update(id=renting_item.id, session=dbsession, is_available=False)
+=======
+    renting_item.is_available = False
+>>>>>>> Stashed changes
     dbsession.add(rent)
     dbsession.commit()
     return rent
@@ -366,6 +434,26 @@ def active_rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
     dbsession.commit()
     return rent
 
+@pytest.fixture
+def expired_reserved_session(dbsession, rentses):
+    """
+    Принимает сессию rentses (RESERVED) и сдвигает её reservation_ts в прошлое, чтобы она стала просроченной согласно RENTAL_SESSION_EXPIRY.
+    Возвращает ID сессии.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    past_ts = now - RENTAL_SESSION_EXPIRY - datetime.timedelta(seconds=1)
+    rentses.reservation_ts = past_ts
+    dbsession.add(rentses)
+    dbsession.commit()
+    return rentses.id
+
+@pytest.fixture
+def active_rentses_with_end_ts(dbsession, active_rentses):
+    """Возвращает активную сессию с предустановленным end_ts."""
+    active_rentses.end_ts = datetime.datetime.now(tz=datetime.timezone.utc)
+    dbsession.add(active_rentses)
+    dbsession.commit()
+    return active_rentses
 
 # Utils
 def model_to_dict(model: BaseDbModel) -> Dict[str, Any]:
