@@ -93,23 +93,16 @@ def authlib_user():
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
-<<<<<<< Updated upstream
-        "user_scopes": [{"id": 0, "name": "string"}],
-=======
         "user_scopes": [{"id": 1, "name": "rental.session.admin"}],  # добавлен нужный скоуп "rental.session.admin" (по сути сейчас эта строка ничего не делает, но как в UnionAuth)
         "scopes": ["rental.session.admin"],  # добавлено для корректной работы прав в тесте test_admin_can_update_any_rental_session
->>>>>>> Stashed changes
         "indirect_groups": [0],
         "groups": [0],
         "id": 0,
         "email": "string",
-<<<<<<< Updated upstream
-=======
         "userdata": [
             {"param": "Полное имя", "value": "Тестов Тест"},
             {"param": "Номер телефона", "value": "+79991234567"}
         ],
->>>>>>> Stashed changes
     }
 
 
@@ -122,12 +115,8 @@ def another_authlib_user():
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
-<<<<<<< Updated upstream
-        "user_scopes": [{"id": 0, "name": "string"}],
-=======
         "user_scopes": [],
         "scopes": [], 
->>>>>>> Stashed changes
         "indirect_groups": [0],
         "groups": [0],
         "id": 1,
@@ -367,7 +356,7 @@ def items_with_same_type(dbsession, item_types) -> List[Item]:
 @pytest.fixture()
 def expire_mock(mocker):
     """Mock-объект для функции check_session_expiration."""
-    fake_check = mocker.patch('rental_backend.routes.rental_session.check_session_expiration')
+    fake_check = mocker.patch('rental_backend.routes.rental_session.check_sessions_expiration')
     fake_check.return_value = True
     return fake_check
 
@@ -410,11 +399,7 @@ def another_rentses(dbsession, items_with_same_type, another_authlib_user) -> Re
         item_id=renting_item.id,
         status=RentStatus.RESERVED,
     )
-<<<<<<< Updated upstream
-    Item.update(id=renting_item.id, session=dbsession, is_available=False)
-=======
     renting_item.is_available = False
->>>>>>> Stashed changes
     dbsession.add(rent)
     dbsession.commit()
     return rent
