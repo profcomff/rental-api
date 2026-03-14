@@ -276,12 +276,12 @@ def items_with_types(dbsession):
         dbsession.add(i)
     dbsession.commit()
     yield items
-    for i in item_types:
-        for item in i.items:
-            dbsession.delete(item)
-        dbsession.flush()
-        dbsession.delete(i)
-    dbsession.commit()
+        # for i in item_types:
+        #     for item in i.items:
+        #         dbsession.delete(item)
+        #     dbsession.flush()
+        #     dbsession.delete(i)
+        # dbsession.commit()
 
 
 @pytest.fixture()
