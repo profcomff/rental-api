@@ -11,7 +11,6 @@ from rental_backend.routes.rental_session import rental_session
 from rental_backend.routes.strike import strike
 from rental_backend.settings import get_settings
 
-
 settings = get_settings()
 app = FastAPI(
     title='Сервис цифрового проката',
