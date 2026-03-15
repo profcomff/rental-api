@@ -26,6 +26,7 @@ from rental_backend.schemas.models import (
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
+
 settings: Settings = get_settings()
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
 
@@ -298,7 +299,6 @@ async def accept_end_rental_session(
     dependencies=[Depends(check_sessions_expiration), Depends(check_sessions_overdue)],
 )
 async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
-
     rental_session: RentalSession | None = (
         RentalSession.query(session=db.session)
         .options(joinedload(RentalSession.strike))

@@ -12,6 +12,7 @@ from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
 from tests.conftest import model_to_dict
 
+
 obj_prefix: str = rental_session.prefix
 
 

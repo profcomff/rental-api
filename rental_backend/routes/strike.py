@@ -11,6 +11,7 @@ from rental_backend.schemas.base import StatusResponseModel
 from rental_backend.schemas.models import StrikeGet, StrikePost
 from rental_backend.utils.action import ActionLogger
 
+
 strike = APIRouter(prefix="/strike", tags=["Strike"])
 
 
