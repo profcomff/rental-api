@@ -255,7 +255,8 @@ def items_with_types(dbsession):
     dbsession.commit()
     yield items
     for i in item_types:
-        for item in i.items:
+        items_to_delete = dbsession.query(Item).filter(Item.type_id == i.id).all()
+        for item in items_to_delete:
             dbsession.delete(item)
         dbsession.flush()
         dbsession.delete(i)
