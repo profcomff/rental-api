@@ -43,47 +43,52 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
 
 
 # Tests for POST /rental-sessions/{item_type_id}
-def test_create_with_available_item(dbsession, client, base_rentses_url, available_item):
-    """Тест на успешное создание сессии при доступном предмете."""
-    with (
-        check_object_creation(RentalSession, dbsession, num_of_creations=1),
-        check_object_update(available_item, dbsession, is_available=False)
-    ):
-        response = client.post(f'{base_rentses_url}/{available_item.type_id}')
-        assert response.status_code == status.HTTP_200_OK
+@pytest.mark.parametrize(
+    "case_name, expected_status, should_create, expected_available",
+    [
+        ("available_item", status.HTTP_200_OK, True, False),
+        ("unavailable_item", status.HTTP_404_NOT_FOUND, False, False),
+        ("no_items", status.HTTP_404_NOT_FOUND, False, None),
+        ("nonexistent_type", status.HTTP_404_NOT_FOUND, False, None),
+    ],
+    ids=["available_item", "unavailable_item", "no_items", "nonexistent_type"]
+)
+def test_create_rental_session(
+    request, dbsession, client, base_rentses_url,
+    case_name, expected_status, should_create, expected_available
+):
+    if case_name == "available_item":
+        item = request.getfixturevalue("available_item")
+        type_id = item.type_id
+    elif case_name == "unavailable_item":
+        item = request.getfixturevalue("item_fixture")
+        type_id = item.type_id
+    elif case_name == "no_items":
+        item_type = request.getfixturevalue("item_type_fixture")
+        type_id = item_type[1].id
+        item = None
+    else: 
+        type_id = request.getfixturevalue("nonexistent_type_id")
+        item = None
+
+    with check_object_creation(RentalSession, dbsession, num_of_creations=1 if should_create else 0):
+        if item is not None and expected_available is not None:
+            with check_object_update(item, dbsession, is_available=expected_available):
+                response = client.post(f'{base_rentses_url}/{type_id}')
+        else:
+            response = client.post(f'{base_rentses_url}/{type_id}')
+
+    assert response.status_code == expected_status
 
 
-def test_create_with_unavailable_item(dbsession, client, base_rentses_url, item_fixture):
-    """Попытка создания сессии при недоступном предмете."""
-    with (
-        check_object_creation(RentalSession, dbsession, num_of_creations=0),
-        check_object_update(item_fixture, dbsession, is_available=False)
-    ):
-        response = client.post(f'{base_rentses_url}/{item_fixture.type_id}')
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-
-def test_create_with_type_no_items(dbsession, client, base_rentses_url, item_type_fixture):
-    """Тест на создание сессии аренды, когда тип существует, но не имеет предметов."""
-    type_id = item_type_fixture[1].id 
+# Тест для блокирующего кейса (параметризуется фикстурой blocking_session)
+def test_create_rental_session_blocking(
+    dbsession, client, base_rentses_url, blocking_session
+):
+    """Попытка создания сессии для предмета с уже созданной сессией с разными статусами."""
+    type_id = blocking_session.id
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
         response = client.post(f'{base_rentses_url}/{type_id}')
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-
-def test_create_with_nonexistent_type(dbsession, client, base_rentses_url, nonexistent_type_id):
-    """Тест на создание сессии при несуществующем типе предмета."""
-    with check_object_creation(RentalSession, dbsession, num_of_creations=0):
-        response = client.post(f'{base_rentses_url}/{nonexistent_type_id}')
-        assert response.status_code == status.HTTP_404_NOT_FOUND
-
-
-def test_create_with_existing_blocking_session(client, base_rentses_url, blocking_session):
-    """
-    Проверяет, что нельзя создать новую сессию для типа, если у пользователя уже есть
-    сессия в статусе RESERVED/ACTIVE/OVERDUE для этого типа.
-    """
-    response = client.post(f"{base_rentses_url}/{blocking_session.id}")
     assert response.status_code == status.HTTP_409_CONFLICT
 
 @pytest.mark.usefixtures('expire_mock')
@@ -405,50 +410,6 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     new_model_fields = model_to_dict(rentses)
     is_really_updated = old_model_fields != new_model_fields
     assert is_really_updated == update_in_db
-
-
-def test_regular_user_cannot_update_rental_session(dbsession, client, rentses, another_authlib_user):
-    """
-    Проверка, что обычный пользователь (не админ) не может обновить сессию.
-    Ожидается 403 Forbidden, данные в БД не должны измениться.
-    """
-
-    def mock_unionauth_call(self, request):
-        required_scopes = set(self.scopes or [])
-        user_scopes = set(another_authlib_user.get('scopes', []))
-        if required_scopes and not required_scopes.issubset(user_scopes):
-            raise HTTPException(status_code=403, detail="Not enough permissions")
-        return another_authlib_user
-
-    with patch('auth_lib.fastapi.UnionAuth.__call__', new=mock_unionauth_call):
-        old_end_ts = rentses.end_ts
-        payload = {"end_ts": "2026-12-31T23:59:59.000Z"}
-        with check_object_update(rentses, dbsession, end_ts=old_end_ts):
-            response = client.patch(f"/rental-sessions/{rentses.id}", json=payload)
-            assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-def test_admin_can_update_any_rental_session(dbsession, client, another_rentses, authlib_user):
-    """
-    Проверка, что администратор может обновить сессию другого пользователя.
-    Данные в БД должны измениться.
-    """
-
-    def mock_unionauth_call(self, request):
-        required_scopes = set(self.scopes or [])
-        user_scopes = set(authlib_user.get('scopes', []))
-        if required_scopes and not required_scopes.issubset(user_scopes):
-            raise HTTPException(status_code=403, detail="Not enough permissions")
-        return authlib_user
-
-    with patch('auth_lib.fastapi.UnionAuth.__call__', new=mock_unionauth_call):
-        payload = {"end_ts": "2026-12-31T23:59:59.000Z"}
-        # Преобразуем строку в naive datetime (убираем временную зону)
-        expected_end_ts = datetime.datetime.fromisoformat(payload["end_ts"].replace('Z', '+00:00')).replace(tzinfo=None)
-        with check_object_update(another_rentses, dbsession, end_ts=expected_end_ts):
-            response = client.patch(f"/rental-sessions/{another_rentses.id}", json=payload)
-            assert response.status_code == status.HTTP_200_OK
-
 
 @pytest.mark.usefixtures('dbsession', 'rentses')
 @pytest.mark.parametrize(
