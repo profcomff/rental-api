@@ -177,9 +177,6 @@ def validate_deadline_ts(deadline_ts: datetime.datetime | None = Query(descripti
 )
 async def start_rental_session(
     session_id:int, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
-    # session_id: int,
-    # deadline_ts=Depends(validate_deadline_ts),
-    # user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
     """
     Starts a rental session, changing its status to ACTIVE.
@@ -282,7 +279,6 @@ async def accept_end_rental_session(
             session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
         )
 
-        # ended_session.strike = new_strike
         ended_session.strike_id = new_strike.id
         db.session.commit()
 
