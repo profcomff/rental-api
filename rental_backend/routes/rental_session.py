@@ -85,7 +85,7 @@ async def check_sessions_overdue():
 )
 async def create_rental_session(
     item_type_id: int,
-    user=Depends(UnionAuth(scopes=["rental.session.create"], enable_userdata=True)), 
+    user=Depends(UnionAuth(scopes=["rental.session.create"], enable_userdata=True)),
 ):
     """
     Создает новую сессию аренды для указанного типа предмета.
@@ -176,9 +176,10 @@ def validate_deadline_ts(deadline_ts: datetime.datetime | None = Query(descripti
     "/{session_id}/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
 async def start_rental_session(
-    session_id: int,
-    deadline_ts=Depends(validate_deadline_ts),
-    user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+    session_id:int, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+    # session_id: int,
+    # deadline_ts=Depends(validate_deadline_ts),
+    # user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
     """
     Starts a rental session, changing its status to ACTIVE.
@@ -232,7 +233,7 @@ async def accept_end_rental_session(
     session_id: int,
     with_strike: bool = Query(False, description="A flag indicating whether to issue a strike."),
     strike_reason: str = Query("", description="The reason for the strike."),
-    user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+    user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
     """
     Ends a rental session, changing its status to RETURNED. Issues a strike if specified.
@@ -281,7 +282,8 @@ async def accept_end_rental_session(
             session=db.session, **strike_info.model_dump(), create_ts=datetime.datetime.now(tz=datetime.timezone.utc)
         )
 
-        ended_session.strike = new_strike
+        # ended_session.strike = new_strike
+        ended_session.strike_id = new_strike.id
         db.session.commit()
 
         ActionLogger.log_event(
@@ -399,7 +401,7 @@ async def get_rental_sessions(
     is_expired: bool = Query(False, description="Флаг, показывать просроченные"),
     item_type_id: int = Query(0, description="ID типа предмета"),
     user_id: int = Query(0, description="User_id для получения сессий"),
-    user=Depends(UnionAuth(scopes=["rental.session.admin"])), 
+    user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
     """
     Retrieves a list of rental sessions with optional status filtering.
@@ -544,7 +546,7 @@ async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
 
 @rental_session.patch("/{session_id}", response_model=RentalSessionGet)
 async def update_rental_session(
-    session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"])) 
+    session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
     """
     Updates the information of a rental session.
