@@ -176,7 +176,7 @@ def validate_deadline_ts(deadline_ts: datetime.datetime | None = Query(descripti
     "/{session_id}/start", response_model=RentalSessionGet, dependencies=[Depends(check_sessions_expiration)]
 )
 async def start_rental_session(
-    session_id:int, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
+    session_id: int, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
     """
     Starts a rental session, changing its status to ACTIVE.
