@@ -1,14 +1,11 @@
-import datetime
 from contextlib import contextmanager
 from typing import Generator
 
 import pytest
-from sqlalchemy import desc
 from starlette import status
-from unittest.mock import patch
-from fastapi import HTTPException
+
 from rental_backend.models.base import BaseDbModel
-from rental_backend.models.db import Item, ItemType, RentalSession, Strike
+from rental_backend.models.db import Item, RentalSession, Strike
 from rental_backend.routes.rental_session import rental_session
 from rental_backend.schemas.models import RentStatus
 from tests.conftest import model_to_dict
@@ -51,11 +48,10 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
         ("no_items", status.HTTP_404_NOT_FOUND, False, None),
         ("nonexistent_type", status.HTTP_404_NOT_FOUND, False, None),
     ],
-    ids=["available_item", "unavailable_item", "no_items", "nonexistent_type"]
+    ids=["available_item", "unavailable_item", "no_items", "nonexistent_type"],
 )
 def test_create_rental_session(
-    request, dbsession, client, base_rentses_url,
-    case_name, expected_status, should_create, expected_available
+    request, dbsession, client, base_rentses_url, case_name, expected_status, should_create, expected_available
 ):
     if case_name == "available_item":
         item = request.getfixturevalue("available_item")
@@ -67,7 +63,7 @@ def test_create_rental_session(
         item_type = request.getfixturevalue("item_type_fixture")
         type_id = item_type[1].id
         item = None
-    else: 
+    else:
         type_id = request.getfixturevalue("nonexistent_type_id")
         item = None
 
@@ -82,14 +78,13 @@ def test_create_rental_session(
 
 
 # Тест для блокирующего кейса (параметризуется фикстурой blocking_session)
-def test_create_rental_session_blocking(
-    dbsession, client, base_rentses_url, blocking_session
-):
+def test_create_rental_session_blocking(dbsession, client, base_rentses_url, blocking_session):
     """Попытка создания сессии для предмета с уже созданной сессией с разными статусами."""
     type_id = blocking_session.id
     with check_object_creation(RentalSession, dbsession, num_of_creations=0):
         response = client.post(f'{base_rentses_url}/{type_id}')
     assert response.status_code == status.HTTP_409_CONFLICT
+
 
 @pytest.mark.usefixtures('expire_mock')
 @pytest.mark.parametrize(
@@ -209,7 +204,15 @@ def test_return_inactive(dbsession, client, rentses, base_rentses_url):
     ],
 )
 def test_return_with_strike(
-    dbsession, client, base_rentses_url, active_rentses, authlib_user, with_strike, strike_reason, right_status_code, strike_created
+    dbsession,
+    client,
+    base_rentses_url,
+    active_rentses,
+    authlib_user,
+    with_strike,
+    strike_reason,
+    right_status_code,
+    strike_created,
 ):
     """Проверяет завершение аренды со страйком."""
     query_dict = dict()
@@ -256,7 +259,7 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
     'session_id, right_status_code',
     [
         (0, status.HTTP_200_OK),
-        #(1, status.HTTP_404_NOT_FOUND),  
+        # (1, status.HTTP_404_NOT_FOUND),
         ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('he-he/hoho', status.HTTP_404_NOT_FOUND),
@@ -410,6 +413,7 @@ def test_update_payload(dbsession, rentses, client, base_rentses_url, payload, r
     new_model_fields = model_to_dict(rentses)
     is_really_updated = old_model_fields != new_model_fields
     assert is_really_updated == update_in_db
+
 
 @pytest.mark.usefixtures('dbsession', 'rentses')
 @pytest.mark.parametrize(

@@ -1,10 +1,10 @@
+import datetime
 import importlib
 import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List
 
-import datetime
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
 from alembic import command
@@ -16,9 +16,9 @@ from testcontainers.postgres import PostgresContainer
 
 from rental_backend.models.db import *
 from rental_backend.routes import app
-from rental_backend.settings import Settings, get_settings
-from rental_backend.schemas.models import RentStatus
 from rental_backend.routes.rental_session import RENTAL_SESSION_EXPIRY
+from rental_backend.schemas.models import RentStatus
+from rental_backend.settings import Settings, get_settings
 
 
 class PostgresConfig:
@@ -93,15 +93,19 @@ def authlib_user():
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
-        "user_scopes": [{"id": 1, "name": "rental.session.admin"}],  # добавлен нужный скоуп "rental.session.admin" (по сути сейчас эта строка ничего не делает, но как в UnionAuth)
-        "scopes": ["rental.session.admin"],  # добавлено для корректной работы прав в тесте test_admin_can_update_any_rental_session
+        "user_scopes": [
+            {"id": 1, "name": "rental.session.admin"}
+        ],  # добавлен нужный скоуп "rental.session.admin" (по сути сейчас эта строка ничего не делает, но как в UnionAuth)
+        "scopes": [
+            "rental.session.admin"
+        ],  # добавлено для корректной работы прав в тесте test_admin_can_update_any_rental_session
         "indirect_groups": [0],
         "groups": [0],
         "id": 0,
         "email": "string",
         "userdata": [
             {"param": "Полное имя", "value": "Тестов Тест"},
-            {"param": "Номер телефона", "value": "+79991234567"}
+            {"param": "Номер телефона", "value": "+79991234567"},
         ],
     }
 
@@ -116,7 +120,7 @@ def another_authlib_user():
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
         "user_scopes": [],
-        "scopes": [], 
+        "scopes": [],
         "indirect_groups": [0],
         "groups": [0],
         "id": 1,
@@ -237,6 +241,7 @@ def item_fixture(dbsession, item_type_fixture):
     dbsession.commit()
     return item
 
+
 @pytest.fixture
 def available_item(dbsession, item_type_fixture):
     """Создаёт доступный предмет для первого типа."""
@@ -245,11 +250,13 @@ def available_item(dbsession, item_type_fixture):
     dbsession.commit()
     return item
 
+
 @pytest.fixture
 def nonexistent_type_id(dbsession):
     """Возвращает заведомо несуществующий ID типа предмета. (для тестов при создании сессий)"""
     max_id = dbsession.query(func.max(ItemType.id)).scalar() or 0
     return max_id + 1
+
 
 @pytest.fixture()
 def items_with_types(dbsession):
@@ -305,6 +312,7 @@ def items_with_same_type_id(dbsession):
         dbsession.delete(i)
     dbsession.commit()
 
+
 @pytest.fixture
 def two_available_items_same_type(dbsession, item_types):
     """
@@ -318,6 +326,7 @@ def two_available_items_same_type(dbsession, item_types):
     dbsession.add_all(items)
     dbsession.commit()
     return item_type
+
 
 @pytest.fixture(params=[RentStatus.RESERVED, RentStatus.ACTIVE, RentStatus.OVERDUE])
 def blocking_session(request, dbsession, two_available_items_same_type, authlib_user):
@@ -335,7 +344,8 @@ def blocking_session(request, dbsession, two_available_items_same_type, authlib_
     items[0].is_available = False
     dbsession.add(session, items[0])
     dbsession.commit()
-    return item_type  
+    return item_type
+
 
 @pytest.fixture
 def items_with_same_type(dbsession, item_types) -> List[Item]:
@@ -413,6 +423,7 @@ def active_rentses(dbsession, item_fixture, authlib_user) -> RentalSession:
     dbsession.commit()
     return rent
 
+
 @pytest.fixture
 def expired_reserved_session(dbsession, rentses):
     """
@@ -426,6 +437,7 @@ def expired_reserved_session(dbsession, rentses):
     dbsession.commit()
     return rentses.id
 
+
 @pytest.fixture
 def active_rentses_with_end_ts(dbsession, active_rentses):
     """Возвращает активную сессию с предустановленным end_ts."""
@@ -433,6 +445,7 @@ def active_rentses_with_end_ts(dbsession, active_rentses):
     dbsession.add(active_rentses)
     dbsession.commit()
     return active_rentses
+
 
 # Utils
 def model_to_dict(model: BaseDbModel) -> Dict[str, Any]:
