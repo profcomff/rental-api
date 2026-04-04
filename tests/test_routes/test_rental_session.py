@@ -51,20 +51,29 @@ def check_object_update(model_instance: BaseDbModel, session, **final_fields):
     ids=["available_item", "unavailable_item", "no_items", "nonexistent_type"],
 )
 def test_create_rental_session(
-    request, dbsession, client, base_rentses_url, case_name, expected_status, should_create, expected_available
+    dbsession,
+    client,
+    base_rentses_url,
+    available_item,
+    item_fixture,
+    item_type_fixture,
+    nonexistent_type_id,
+    case_name,
+    expected_status,
+    should_create,
+    expected_available,
 ):
     if case_name == "available_item":
-        item = request.getfixturevalue("available_item")
-        type_id = item.type_id
+        type_id = available_item.type_id
+        item = available_item
     elif case_name == "unavailable_item":
-        item = request.getfixturevalue("item_fixture")
-        type_id = item.type_id
+        type_id = item_fixture.type_id
+        item = item_fixture
     elif case_name == "no_items":
-        item_type = request.getfixturevalue("item_type_fixture")
-        type_id = item_type[1].id
+        type_id = item_type_fixture[1].id
         item = None
     else:
-        type_id = request.getfixturevalue("nonexistent_type_id")
+        type_id = nonexistent_type_id
         item = None
 
     with check_object_creation(RentalSession, dbsession, num_of_creations=1 if should_create else 0):
@@ -77,7 +86,6 @@ def test_create_rental_session(
     assert response.status_code == expected_status
 
 
-# Тест для блокирующего кейса (параметризуется фикстурой blocking_session)
 def test_create_rental_session_blocking(dbsession, client, base_rentses_url, blocking_session):
     """Попытка создания сессии для предмета с уже созданной сессией с разными статусами."""
     type_id = blocking_session.id
@@ -116,7 +124,6 @@ def test_create_and_expire(client, base_rentses_url, expired_reserved_session):
     assert response.json()["status"] == RentStatus.EXPIRED
 
 
-# Тест на начало уже активной сессии
 def test_start_already_active_session(dbsession, client, base_rentses_url, active_rentses):
     """Проверка, что нельзя начать уже активную сессию."""
     response = client.patch(f'{base_rentses_url}/{active_rentses.id}/start')
@@ -259,7 +266,6 @@ def test_return_with_set_end_ts(dbsession, client, base_rentses_url, active_rent
     'session_id, right_status_code',
     [
         (0, status.HTTP_200_OK),
-        # (1, status.HTTP_404_NOT_FOUND),
         ('hihi', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('ha-ha', status.HTTP_422_UNPROCESSABLE_ENTITY),
         ('he-he/hoho', status.HTTP_404_NOT_FOUND),

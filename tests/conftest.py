@@ -93,12 +93,7 @@ def authlib_user():
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
-        "user_scopes": [
-            {"id": 1, "name": "rental.session.admin"}
-        ],  # добавлен нужный скоуп "rental.session.admin" (по сути сейчас эта строка ничего не делает, но как в UnionAuth)
-        "scopes": [
-            "rental.session.admin"
-        ],  # добавлено для корректной работы прав в тесте test_admin_can_update_any_rental_session
+        "user_scopes": [{"id": 0, "name": "string"}],
         "indirect_groups": [0],
         "groups": [0],
         "id": 0,
@@ -119,8 +114,7 @@ def another_authlib_user():
     return {
         "auth_methods": ["string"],
         "session_scopes": [{"id": 0, "name": "string"}],
-        "user_scopes": [],
-        "scopes": [],
+        "user_scopes": [{"id": 0, "name": "string"}],
         "indirect_groups": [0],
         "groups": [0],
         "id": 1,
@@ -243,9 +237,9 @@ def item_fixture(dbsession, item_type_fixture):
 
 
 @pytest.fixture
-def available_item(dbsession, item_type_fixture):
+def available_item(dbsession, item_types):
     """Создаёт доступный предмет для первого типа."""
-    item = Item(type_id=item_type_fixture[0].id, is_available=True)
+    item = Item(type_id=item_types[0].id, is_available=True)
     dbsession.add(item)
     dbsession.commit()
     return item
