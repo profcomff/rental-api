@@ -196,11 +196,11 @@ async def make_item_type_available(
     """
     if count < 0:
         raise ValueError(count)
-    types = db.session.query(ItemType).filter(ItemType.id == id).one_or_none()
+    types = ItemType.query(session=db.session).filter(ItemType.id == id).one_or_none()
     if not types:
         raise ObjectNotFound(ItemType, id)
     items = (
-        db.session.query(Item)
+        Item.query(session=db.session)
         .outerjoin(
             RentalSession,
             and_(RentalSession.item_id == Item.id, RentalSession.status.in_([RentStatus.ACTIVE, RentStatus.RESERVED])),
@@ -212,9 +212,9 @@ async def make_item_type_available(
     unavailable_items = items.filter(Item.is_available == False).all()
     result = {"item_ids": [], "items_changed": 0, "total_available": len(available_items)}
     if len(available_items) >= count:
-        for i in range(len(available_items) - count):
-            updated_item = Item.update(available_items[i].id, session=db.session, is_available=False)
-            result["item_ids"].append(items[i].id)
+        for item in available_items[count:]:
+            updated_item = Item.update(item.id, session=db.session, is_available=False)
+            result["item_ids"].append(item.id)
             result["items_changed"] += 1
             result["total_available"] -= 1
             ActionLogger.log_event(
@@ -222,12 +222,12 @@ async def make_item_type_available(
                 admin_id=user.get('id'),
                 session_id=None,
                 action_type="AVAILABLE_ITEM_TYPE",
-                details={"id": items[i].id},
+                details={"id": item.id},
             )
     else:
-        for i in range(min(len(unavailable_items), count - len(available_items))):
-            updated_item = Item.update(unavailable_items[i].id, session=db.session, is_available=True)
-            result["item_ids"].append(items[i].id)
+        for item in unavailable_items[: count - len(available_items)]:
+            updated_item = Item.update(item.id, session=db.session, is_available=True)
+            result["item_ids"].append(item.id)
             result["items_changed"] += 1
             result["total_available"] += 1
 
@@ -236,7 +236,7 @@ async def make_item_type_available(
                 admin_id=user.get('id'),
                 session_id=None,
                 action_type="AVAILABLE_ITEM_TYPE",
-                details={"id": items[i].id},
+                details={"id": item.id},
             )
     return ItemTypeAvailable.model_validate(result)
 
