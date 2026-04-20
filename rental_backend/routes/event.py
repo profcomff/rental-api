@@ -7,7 +7,6 @@ from fastapi_sqlalchemy import db
 from rental_backend.models.db import Event
 from rental_backend.schemas.models import EventGet
 
-
 event = APIRouter(prefix="/event", tags=["Event"])
 
 
@@ -19,14 +18,28 @@ async def get_events(
     user=Depends(UnionAuth(scopes=["rental.event.view"], auto_error=False)),
 ) -> list[EventGet]:
     """
-    Retrieves a list of events, with optional filtering.
+    Возвращает список событий с возможностью фильтрации.
 
-    Scopes: `["rental.event.view"]`
+    Эндпоинт позволяет получить все события или отфильтровать их по пользователю,
+    администратору и сессии аренды.
 
-    - **admin_id**: Filter events by admin ID.
-    - **session_id**: Filter events by session ID.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на просмотр событий
 
-    Returns a list of events.
+    Скоупы:
+    - `rental.event.view`
+
+    Параметры:
+    - `user_id` — (необязательный) фильтр по идентификатору пользователя
+    - `admin_id` — (необязательный) фильтр по идентификатору администратора
+    - `session_id` — (необязательный) фильтр по идентификатору сессии аренды
+
+    Возвращает:
+    - список объектов `Event`
+
+    Ошибки:
+    - отсутствуют
     """
     query = db.session.query(Event)
     if user_id is not None:

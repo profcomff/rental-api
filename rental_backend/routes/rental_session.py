@@ -26,7 +26,6 @@ from rental_backend.schemas.models import (
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
-
 settings: Settings = get_settings()
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
 
@@ -88,13 +87,26 @@ async def create_rental_session(
     user=Depends(UnionAuth(scopes=["rental.session.create"], enable_userdata=True)),
 ):
     """
-    Создает новую сессию аренды для указанного типа предмета.
+    Создает новую сессию аренды для указанного типа предмета и резервирует его.
 
-    Cкоупы: `["rental.session.create"]`
+    Условия:
+    - У пользователя нет активной / зарезервированной / просроченной сессии
+    - Есть доступный предмет
+    - Не превышен лимит на частоту создания сессий
 
-    :param item_type_id: Идентификатор типа предмета.
-    :raises NoneAvailable: Если нет доступных предметов указанного типа.
-    :raises SessionExists: Если у пользователя уже есть сессия с указанным типом предмета.
+    Скоупы:
+    - `rental.session.create`
+
+    Параметры:
+    - `item_type_id` — идентификатор типа предмета
+
+    Возвращает:
+    - созданную `RentalSession`
+
+    Ошибки:
+    - `SessionExists` — уже есть активная сессия
+    - `NoneAvailable` — нет доступных предметов
+    - `RateLimiterError` — превышен лимит
     """
     exist_session_item: list[RentalSession] = RentalSession.query(session=db.session).filter(
         RentalSession.user_id == user.get("id"), RentalSession.item_type_id == item_type_id
@@ -179,15 +191,30 @@ async def start_rental_session(
     session_id: int, deadline_ts=Depends(validate_deadline_ts), user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
     """
-    Starts a rental session, changing its status to ACTIVE.
+    Запускает сессию аренды и переводит её из статуса `RESERVED` в `ACTIVE`.
 
-    Scopes: `["rental.session.admin"]`
+    После запуска:
+    - устанавливается время начала аренды (`start_ts`)
+    - сохраняется идентификатор администратора (`admin_open_id`)
+    - устанавливается дедлайн возврата (`deadline_ts`), если он не был передан
 
-    - **session_id**: The ID of the rental session to start.
+    Условия:
+    - Сессия должна существовать
+    - Сессия должна находиться в статусе `RESERVED`
 
-    Returns the updated rental session.
+    Скоупы:
+    - `rental.session.admin`
 
-    Raises **ObjectNotFound** if the session with the specified ID is not found.
+    Параметры:
+    - `session_id` — идентификатор сессии аренды
+    - `deadline_ts` — (опционально) дедлайн возврата, если не указан — вычисляется автоматически
+
+    Возвращает:
+    - обновленную `RentalSession` со статусом `ACTIVE`
+
+    Ошибки:
+    - `ObjectNotFound` — сессия с указанным id не найдена
+    - `ForbiddenAction` — сессию нельзя запустить (неверный статус)
     """
     session: RentalSession = RentalSession.get(session_id, session=db.session)
     if not session:
@@ -233,19 +260,36 @@ async def accept_end_rental_session(
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
     """
-    Ends a rental session, changing its status to RETURNED. Issues a strike if specified.
+    Завершает сессию аренды и переводит её в статус `RETURNED`.
 
-    Scopes: `["rental.session.admin"]`
+    После завершения:
+    - устанавливается фактическое время возврата (`actual_return_ts`)
+    - сохраняется идентификатор администратора, завершившего аренду (`admin_close_id`)
+    - предмет снова становится доступным для аренды (`item.is_available = True`)
 
-    - **session_id**: The ID of the rental session to end.
-    - **with_strike**: A flag indicating whether to issue a strike.
-    - **strike_reason**: The reason for the strike.
+    Дополнительно можно выдать страйк пользователю:
+    - если `with_strike=True`, создается новый страйк
+    - причина страйка передается через `strike_reason`
+    - созданный страйк привязывается к завершенной сессии
 
-    Returns the updated rental session.
+    Условия:
+    - Сессия должна существовать
+    - Сессия должна находиться в статусе `ACTIVE` или `OVERDUE`
 
-    Raises:
-    - **ObjectNotFound**: If the session with the specified ID is not found.
-    - **InactiveSession**: If the session is not active.
+    Скоупы:
+    - `rental.session.admin`
+
+    Параметры:
+    - `session_id` — идентификатор сессии аренды
+    - `with_strike` — нужно ли выдать страйк при завершении аренды
+    - `strike_reason` — причина выдачи страйка
+
+    Возвращает:
+    - обновленную `RentalSession` со статусом `RETURNED`
+
+    Ошибки:
+    - `ObjectNotFound` — сессия с указанным id не найдена
+    - `InactiveSession` — сессию нельзя завершить, так как она не находится в статусе `ACTIVE` или `OVERDUE`
     """
     rent_session = RentalSession.get(id=session_id, session=db.session)
     if not rent_session:
@@ -299,6 +343,28 @@ async def accept_end_rental_session(
     dependencies=[Depends(check_sessions_expiration), Depends(check_sessions_overdue)],
 )
 async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
+    """
+    Возвращает сессию аренды по её идентификатору.
+
+    Перед получением выполняется проверка истекших и просроченных сессий,
+    чтобы вернуть актуальное состояние данных. В ответ также включается
+    информация о страйке, если он привязан к данной сессии.
+
+    Условия:
+    - Сессия должна существовать
+
+    Скоупы:
+    - `rental.session.admin`
+
+    Параметры:
+    - `session_id` — идентификатор сессии аренды
+
+    Возвращает:
+    - объект `RentalSession` с данными о сессии и `strike_id`, если он есть
+
+    Ошибки:
+    - `ObjectNotFound` — сессия не найдена
+    """
     rental_session: RentalSession | None = (
         RentalSession.query(session=db.session)
         .options(joinedload(RentalSession.strike))
@@ -400,19 +466,37 @@ async def get_rental_sessions(
     user=Depends(UnionAuth(scopes=["rental.session.admin"])),
 ):
     """
-    Retrieves a list of rental sessions with optional status filtering.
+    Возвращает список сессий аренды с возможностью фильтрации по статусам, пользователю и типу предмета.
 
-    Scopes: `["rental.session.admin"]`
+    Перед выполнением запроса автоматически обновляются истекшие и просроченные сессии,
+    чтобы вернуть актуальные данные.
 
-    - **is_reserved**: Filter by reserved sessions.
-    - **is_canceled**: Filter by canceled sessions.
-    - **is_dismissed**: Filter by dismissed sessions.
-    - **is_overdue**: Filter by overdue sessions.
-    - **is_returned**: Filter by returned sessions.
-    - **is_active**: Filter by active sessions.
-    - **is_expired**: Filter by expired sessions.
-    - **user_id**: User_id to get sessions
-    Returns a list of rental sessions.
+    Фильтрация:
+    - Можно указать один или несколько флагов статусов (`is_reserved`, `is_active` и т.д.)
+    - Если ни один статус не указан — возвращаются все сессии
+    - Можно дополнительно отфильтровать по `user_id` и `item_type_id`
+
+    Результат сортируется по статусу и времени создания (reservation_ts).
+
+    Скоупы:
+    - `rental.session.admin`
+
+    Параметры:
+    - `is_reserved` — показывать сессии со статусом `RESERVED`
+    - `is_canceled` — показывать сессии со статусом `CANCELED`
+    - `is_dismissed` — показывать сессии со статусом `DISMISSED`
+    - `is_overdue` — показывать сессии со статусом `OVERDUE`
+    - `is_returned` — показывать сессии со статусом `RETURNED`
+    - `is_active` — показывать сессии со статусом `ACTIVE`
+    - `is_expired` — показывать сессии со статусом `EXPIRED`
+    - `item_type_id` — фильтр по типу предмета
+    - `user_id` — фильтр по пользователю
+
+    Возвращает:
+    - список объектов `RentalSession`, удовлетворяющих условиям фильтрации
+
+    Ошибки:
+    - отсутствуют (пустой список, если ничего не найдено)
     """
     return await get_rental_sessions_common(
         db_session=db.session,
@@ -446,16 +530,33 @@ async def get_my_sessions(
     user=Depends(UnionAuth()),
 ):
     """
-    Retrieves a list of rental sessions for the user with optional status filtering.
+    Возвращает список сессий аренды текущего пользователя с возможностью фильтрации.
 
-    - **is_reserved**: Filter by reserved sessions.
-    - **is_canceled**: Filter by canceled sessions.
-    - **is_dismissed**: Filter by dismissed sessions.
-    - **is_overdue**: Filter by overdue sessions.
-    - **is_returned**: Filter by returned sessions.
-    - **is_active**: Filter by active sessions.
-    - **is_expired**: Filter by expired sessions.
-    Returns a list of rental sessions.
+    Перед выполнением запроса автоматически обновляются истекшие и просроченные сессии,
+    чтобы вернуть актуальные данные.
+
+    Фильтрация:
+    - Можно указать один или несколько флагов статусов (`is_reserved`, `is_active` и т.д.)
+    - Если ни один статус не указан — возвращаются все сессии пользователя
+    - Можно дополнительно отфильтровать по `item_type_id`
+
+    В отличие от административного эндпоинта, возвращаются только сессии текущего пользователя.
+
+    Параметры:
+    - `is_reserved` — показывать сессии со статусом `RESERVED`
+    - `is_canceled` — показывать сессии со статусом `CANCELED`
+    - `is_dismissed` — показывать сессии со статусом `DISMISSED`
+    - `is_overdue` — показывать сессии со статусом `OVERDUE`
+    - `is_returned` — показывать сессии со статусом `RETURNED`
+    - `is_active` — показывать сессии со статусом `ACTIVE`
+    - `is_expired` — показывать сессии со статусом `EXPIRED`
+    - `item_type_id` — фильтр по типу предмета
+
+    Возвращает:
+    - список объектов `RentalSession`, принадлежащих текущему пользователю
+
+    Ошибки:
+    - отсутствуют (пустой список, если ничего не найдено)
     """
     return await get_rental_sessions_common(
         db_session=db.session,
@@ -474,16 +575,23 @@ async def get_my_sessions(
 @rental_session.delete("/{session_id}", response_model=StatusResponseModel)
 async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
     """
-    Deletes a session.
+    Удаляет сессию аренды по её идентификатору.
 
-    Scopes: `["rental.session.admin"]`
+    Удаление возможно только для завершённых или неактивных сессий.
+    Сессии в статусах `RESERVED`, `ACTIVE` или `OVERDUE` удалить нельзя.
 
-    - **session_id**: The ID of the rental session to delete.
+    Скоупы:
+    - `rental.session.admin`
 
-    Returns the deleted rental session.
+    Параметры:
+    - `session_id` — идентификатор сессии аренды
 
-    Raises **ForbiddenAction** if the session is in RESERVED, ACTIVE, OVERDUE status.
-    Raises **ObjectNotFound** if the session does not exist.
+    Возвращает:
+    - объект `StatusResponseModel` с информацией об успешном удалении
+
+    Ошибки:
+    - `ObjectNotFound` — сессия с указанным id не найдена
+    - `ForbiddenAction` — сессию нельзя удалить (она находится в активном или блокирующем статусе)
     """
     session = RentalSession.get(id=session_id, session=db.session)
     if (
@@ -505,13 +613,23 @@ async def delete_rental_session(session_id: int, user=Depends(UnionAuth(scopes=[
 )
 async def cancel_rental_session(session_id: int, user=Depends(UnionAuth())):
     """
-    Cancels a session in the RESERVED status. Can only be canceled by the user who created it.
+    Отменяет сессию аренды, переводя её в статус `CANCELED`.
 
-    - **session_id**: The ID of the rental session to cancel.
+    Отмена возможна только для сессий в статусе `RESERVED` и только пользователем,
+    который создал эту сессию.
 
-    Returns the canceled rental session.
+    После отмены:
+    - устанавливается время завершения (`end_ts`)
+    - предмет снова становится доступным для аренды (`item.is_available = True`)
 
-    Raises **ForbiddenAction** if the user is not the owner or the session is not in RESERVED status.
+    Параметры:
+    - `session_id` — идентификатор сессии аренды
+
+    Возвращает:
+    - обновленную `RentalSession` со статусом `CANCELED`
+
+    Ошибки:
+    - `ForbiddenAction` — пользователь не является владельцем сессии или сессия не в статусе `RESERVED`
     """
     session = RentalSession.get(id=session_id, session=db.session)
 
@@ -545,16 +663,25 @@ async def update_rental_session(
     session_id: int, update_data: RentalSessionPatch, user=Depends(UnionAuth(scopes=["rental.session.admin"]))
 ):
     """
-    Updates the information of a rental session.
+    Обновляет данные сессии аренды по её идентификатору.
 
-    Scopes: `["rental.session.admin"]`
+    Эндпоинт позволяет частично изменить поля сессии аренды, переданные в `update_data`.
+    Обновляются только те значения, которые были явно указаны в запросе.
 
-    - **session_id**: The ID of the rental session to update.
-    - **update_data**: The data to update the session with.
+    После обновления действие логируется как `UPDATE_SESSION`.
 
-    Returns the updated rental session.
+    Скоупы:
+    - `rental.session.admin`
 
-    Raises **ObjectNotFound** if the session with the specified ID is not found.
+    Параметры:
+    - `session_id` — идентификатор сессии аренды
+    - `update_data` — набор полей для частичного обновления сессии
+
+    Возвращает:
+    - обновленный объект `RentalSession`
+
+    Ошибки:
+    - `ObjectNotFound` — сессия с указанным id не найдена
     """
     session = RentalSession.get(id=session_id, session=db.session)
     if not session:

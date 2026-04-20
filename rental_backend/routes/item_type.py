@@ -15,7 +15,6 @@ from rental_backend.schemas.models import ItemTypeAvailable, ItemTypeGet, ItemTy
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
-
 settings: Settings = get_settings()
 item_type = APIRouter(prefix="/itemtype", tags=["ItemType"])
 
@@ -64,13 +63,30 @@ def _calculate_cool_down_end_ts_for_types(
 @item_type.get("/{id}", response_model=ItemTypeGet, dependencies=[Depends(check_sessions_expiration)])
 async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
     """
-    Retrieves information about an item type by its ID.
+    Возвращает информацию о типе предмета по его идентификатору.
 
-    - **id**: The ID of the item type.
+    Перед выполнением запроса производится проверка истекших сессий аренды.
+    В ответ дополнительно включается:
+    - текущая доступность предметов данного типа для пользователя
+    - время окончания cooldown (если действует ограничение на создание сессий)
 
-    Returns the item type information.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Тип предмета с указанным `id` должен существовать
 
-    Raises **ObjectNotFound** if the item type with the specified ID is not found.
+    Скоупы:
+    - отсутствуют (доступно любому аутентифицированному пользователю)
+
+    Параметры:
+    - `id` — идентификатор типа предмета
+
+    Возвращает:
+    - объект `ItemType` с дополнительными полями:
+    - `availability` — доступность предметов данного типа для пользователя
+    - `cool_down_end_ts` — время окончания cooldown (если применимо)
+
+    Ошибки:
+    - `ObjectNotFound` — тип предмета с указанным `id` не найден
     """
 
     item_type: ItemType = ItemType.query(session=db.session).filter(ItemType.id == id).one_or_none()
@@ -86,11 +102,32 @@ async def get_item_type(id: int, user=Depends(UnionAuth())) -> ItemTypeGet:
 @item_type.get("", response_model=list[ItemTypeGet], dependencies=[Depends(check_sessions_expiration)])
 async def get_items_types(user=Depends(UnionAuth(auto_error=False))) -> list[ItemTypeGet]:
     """
-    Retrieves a list of all item types.
+    Возвращает список всех типов предметов.
 
-    Returns a list of all item types.
+    Перед выполнением запроса производится проверка истекших сессий аренды.
+    Для каждого типа предмета в ответ дополнительно рассчитываются:
+    - текущее количество доступных предметов
+    - доступность для пользователя
+    - время окончания cooldown (если действует ограничение на создание сессий)
 
-    Raises **ObjectNotFound** if no item types are found.
+    Условия:
+    - Авторизация не обязательна
+    - В системе должен существовать хотя бы один тип предмета
+
+    Скоупы:
+    - отсутствуют
+
+    Параметры:
+    - отсутствуют
+
+    Возвращает:
+    - список объектов `ItemType` с дополнительными полями:
+    - `available_items_count` — количество доступных предметов данного типа
+    - `availability` — доступность предметов данного типа для пользователя
+    - `cool_down_end_ts` — время окончания cooldown (если применимо)
+
+    Ошибки:
+    - `ObjectNotFound` — в системе не найдено ни одного типа предмета
     """
     item_types_all: list[ItemType] = ItemType.query(session=db.session).all()
     if not item_types_all:
@@ -126,13 +163,25 @@ async def create_item_type(
     user=Depends(UnionAuth(scopes=["rental.item_type.create"], allow_none=False)),
 ) -> ItemTypeGet:
     """
-    Creates a new item type.
+    Создает новый тип предмета.
 
-    Scopes: `["rental.item_type.create"]`
+    После успешного создания действие логируется как `CREATE_ITEM_TYPE`.
 
-    - **item_type_info**: The data for the new item type.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на создание типов предметов
 
-    Returns the created item type.
+    Скоупы:
+    - `rental.item_type.create`
+
+    Параметры:
+    - `item_type_info` — данные нового типа предмета
+
+    Возвращает:
+    - созданный объект `ItemType`
+
+    Ошибки:
+    - отсутствуют
     """
     new_item_type = ItemType.create(session=db.session, **item_type_info.model_dump())
     ActionLogger.log_event(
@@ -150,16 +199,28 @@ async def update_item_type(
     id: int, item_type_info: ItemTypePost, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
 ) -> ItemTypeGet:
     """
-    Updates the information of an item type by its ID.
+    Обновляет тип предмета по его идентификатору.
 
-    Scopes: `["rental.item_type.update"]`
+    Перед обновлением проверяется, существует ли тип предмета с указанным `id`.
+    После успешного обновления действие логируется как `UPDATE_ITEM_TYPE`.
 
-    - **id**: The ID of the item type.
-    - **item_type_info**: The data to update the item type with.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на изменение типов предметов
+    - Тип предмета с указанным `id` должен существовать
 
-    Returns the updated item type.
+    Скоупы:
+    - `rental.item_type.update`
 
-    Raises **ObjectNotFound** if the item type with the specified ID is not found.
+    Параметры:
+    - `id` — идентификатор типа предмета
+    - `item_type_info` — новые данные типа предмета
+
+    Возвращает:
+    - обновленный объект `ItemType`
+
+    Ошибки:
+    - `ObjectNotFound` — тип предмета с указанным `id` не найден
     """
     item_type_to_update = ItemType.get(id, session=db.session)
     if item_type_to_update is None:
@@ -180,19 +241,38 @@ async def make_item_type_available(
     id: int, count: int, user=Depends(UnionAuth(scopes=["rental.item_type.update"], allow_none=False))
 ) -> ItemTypeAvailable:
     """
-    Делает один предмет доступным по ID типа предмета.
+    Изменяет количество доступных предметов для указанного типа.
 
-    Скоупы: `["rental.item_type.update"]`
+    Эндпоинт устанавливает целевое количество доступных предметов (`count`).
+    Если текущих доступных предметов больше — лишние становятся недоступными.
+    Если меньше — недостающие предметы делаются доступными.
+    Если невозможно достичь точного значения (например, недостаточно предметов),
+    устанавливается максимально возможное количество.
 
-    - **id**: ID типа предмета.
-    - **count**: Абсолютное количество предметов, которые нужно сделать доступными.
-    Если доступных меньше, делает больше доступных. Если доступных больше, делает меньше доступных.
-    Если нет возможности сделать count доступных, делает доступным максимально возможное количество.
-    Возвращает id всех возвращенных предметов и их количество.
+    В обработке участвуют только предметы, не занятые активными или зарезервированными сессиями.
 
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на изменение типов предметов
+    - Тип предмета с указанным `id` должен существовать
+    - `count` должен быть неотрицательным
 
+    Скоупы:
+    - `rental.item_type.update`
 
-    Вызывает **ObjectNotFound**, если тип предмета с указанным ID не найден.
+    Параметры:
+    - `id` — идентификатор типа предмета
+    - `count` — целевое количество доступных предметов
+
+    Возвращает:
+    - объект `ItemTypeAvailable`
+    - `item_ids` — список измененных предметов
+    - `items_changed` — количество измененных предметов
+    - `total_available` — итоговое количество доступных предметов
+
+    Ошибки:
+    - `ObjectNotFound` — тип предмета с указанным `id` не найден
+    - `ValueError` — передано отрицательное значение `count`
     """
     if count < 0:
         raise ValueError(count)
@@ -246,17 +326,29 @@ async def delete_item_type(
     id: int, user=Depends(UnionAuth(scopes=["rental.item_type.delete"], allow_none=False))
 ) -> StatusResponseModel:
     """
-    Deletes an item type by its ID.
+    Удаляет тип предмета по его идентификатору.
 
-    Scopes: `["rental.item_type.delete"]`
+    Удаление возможно только в том случае, если тип предмета существует и с ним не связано ни одного предмета.
+    После успешного удаления действие логируется как `DELETE_ITEM_TYPE`.
 
-    - **id**: The ID of the item type.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на удаление типов предметов
+    - Тип предмета с указанным `id` должен существовать
+    - У типа предмета не должно быть связанных предметов
 
-    Returns a status response.
+    Скоупы:
+    - `rental.item_type.delete`
 
-    Raises **ObjectNotFound** if the item type with the specified ID is not found.
+    Параметры:
+    - `id` — идентификатор типа предмета
 
-    Raises **ForbiddenAction** if the item type with the specified ID has items.
+    Возвращает:
+    - объект `StatusResponseModel` со статусом удаления
+
+    Ошибки:
+    - `ObjectNotFound` — тип предмета с указанным `id` не найден
+    - `ForbiddenAction` — тип предмета нельзя удалить, так как с ним связаны предметы
     """
     item_type_to_delete = ItemType.get(id, session=db.session)
     if item_type_to_delete is None:
