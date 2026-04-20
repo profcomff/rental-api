@@ -366,19 +366,19 @@ async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["re
         Ошибки:
         - `ObjectNotFound` — сессия не найдена
         """
-    rental_session: RentalSession | None = (
+        rental_session: RentalSession | None = (
         RentalSession.query(session=db.session)
         .options(joinedload(RentalSession.strike))
         .filter(RentalSession.id == session_id)
         .first()
     )
 
-    if not rental_session:
-        raise ObjectNotFound(RentalSession, session_id)
+        if not rental_session:
+            raise ObjectNotFound(RentalSession, session_id)
 
-    result: RentalSessionGet = RentalSessionGet.model_validate(rental_session)
-    result.strike_id = rental_session.strike.id if rental_session.strike else None
-    return result
+        result: RentalSessionGet = RentalSessionGet.model_validate(rental_session)
+        result.strike_id = rental_session.strike.id if rental_session.strike else None
+        return result
 
 
 async def get_rental_sessions_common(

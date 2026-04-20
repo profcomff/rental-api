@@ -20,15 +20,27 @@ async def create_strike(
     strike_info: StrikePost, user=Depends(UnionAuth(scopes=["rental.strike.create"], allow_none=False))
 ) -> StrikeGet:
     """
-    Creates a new strike.
+    Создает новый страйк.
 
-    Scopes: `["rental.strike.create"]`
+    Перед созданием проверяется, существует ли сессия аренды с указанным `session_id`.
+    После успешного создания действие логируется как `CREATE_STRIKE`.
 
-    - **strike_info**: The data for the new strike.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на создание страйков
+    - Сессия аренды с указанным `session_id` должна существовать
 
-    Returns the created strike.
+    Скоупы:
+    - `rental.strike.create`
 
-    If session does not exist returns ObjectNotFound.
+    Параметры:
+    - `strike_info` — данные нового страйка
+
+    Возвращает:
+    - созданный объект `Strike`
+
+    Ошибки:
+    - `ObjectNotFound` — сессия аренды с указанным `session_id` не найдена
     """
     sessions = db.session.query(RentalSession).filter(RentalSession.id == strike_info.session_id).one_or_none()
     if not sessions:
@@ -49,11 +61,22 @@ async def create_strike(
 @strike.get("/user/{user_id}", response_model=list[StrikeGet])
 async def get_user_strikes(user_id: int) -> list[StrikeGet]:
     """
-    Retrieves a list of strikes for a specific user.
+    Возвращает список страйков пользователя по его идентификатору.
 
-    - **user_id**: The ID of the user.
+    Условия:
+    - отсутствуют (доступно без авторизации)
 
-    Returns a list of strikes.
+    Скоупы:
+    - отсутствуют
+
+    Параметры:
+    - `user_id` — идентификатор пользователя
+
+    Возвращает:
+    - список объектов `Strike`
+
+    Ошибки:
+    - отсутствуют
     """
     strikes = Strike.query(session=db.session).filter(Strike.user_id == user_id).all()
     return [StrikeGet.model_validate(strike) for strike in strikes]
@@ -69,18 +92,31 @@ async def get_strikes(
     user=Depends(UnionAuth(scopes=["rental.strike.read"], allow_none=False)),
 ) -> list[StrikeGet]:
     """
-    Retrieves a list of strikes with optional filtering.
+    Возвращает список страйков с возможностью фильтрации.
 
-    Scopes: `["rental.strike.read"]`
+    Эндпоинт позволяет получить страйки и отфильтровать их по пользователю,
+    администратору, сессии аренды и диапазону дат создания.
 
-    - **admin_id**: Filter strikes by admin ID.
-    - **session_id**: Filter strikes by session ID.
-    - **from_date**: Filter strikes created after this date.
-    - **to_date**: Filter strikes created before this date.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на просмотр страйков
+    - При использовании фильтра по дате должны быть указаны оба параметра: `from_date` и `to_date`
 
-    Returns a list of strikes.
+    Скоупы:
+    - `rental.strike.read`
 
-    Raises **DateRangeError** if only one of `from_date` or `to_date` is provided.
+    Параметры:
+    - `user_id` — (необязательный) фильтр по идентификатору пользователя
+    - `admin_id` — (необязательный) фильтр по идентификатору администратора
+    - `session_id` — (необязательный) фильтр по идентификатору сессии аренды
+    - `from_date` — (необязательный) начало диапазона дат создания
+    - `to_date` — (необязательный) конец диапазона дат создания
+
+    Возвращает:
+    - список объектов `Strike`
+
+    Ошибки:
+    - `DateRangeError` — указан только один из параметров `from_date` или `to_date`
     """
     if (from_date is None) != (to_date is None):
         raise DateRangeError()
@@ -103,15 +139,27 @@ async def delete_strike(
     id: int, user=Depends(UnionAuth(scopes=["rental.strike.delete"], allow_none=False))
 ) -> StatusResponseModel:
     """
-    Deletes a strike by its ID.
+    Удаляет страйк по его идентификатору.
 
-    Scopes: `["rental.strike.delete"]`
+    Перед удалением проверяется, существует ли страйк с указанным `id`.
+    После успешного удаления действие логируется как `DELETE_STRIKE`.
 
-    - **id**: The ID of the strike to delete.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на удаление страйков
+    - Страйк с указанным `id` должен существовать
 
-    Returns a status response.
+    Скоупы:
+    - `rental.strike.delete`
 
-    Raises **ObjectNotFound** if the strike with the specified ID is not found.
+    Параметры:
+    - `id` — идентификатор страйка
+
+    Возвращает:
+    - объект `StatusResponseModel` со статусом удаления
+
+    Ошибки:
+    - `ObjectNotFound` — страйк с указанным `id` не найден
     """
     strike = Strike.get(id, session=db.session)
     if strike is None:

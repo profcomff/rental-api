@@ -18,11 +18,22 @@ item = APIRouter(prefix="/item", tags=["Items"])
 @item.get("", response_model=list[ItemGet])
 async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
     """
-    Retrieves a list of items. If `type_id` is specified, only items of that type are returned.
+    Возвращает список предметов. При указании `type_id` возвращаются только предметы заданного типа.
 
-    - **type_id**: The ID of the item type (optional).
+    Условия:
+    - Пользователь должен быть аутентифицирован
 
-    Returns a list of items.
+    Скоупы:
+    - отсутствуют (доступно любому авторизованному пользователю)
+
+    Параметры:
+    - `type_id` — (необязательный) идентификатор типа предмета для фильтрации
+
+    Возвращает:
+    - список объектов `Item`
+
+    Ошибки:
+    - отсутствуют
     """
     query = Item.query(session=db.session)
     if type_id is not None:
@@ -34,15 +45,27 @@ async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> li
 @item.post("", response_model=ItemGet)
 async def create_item(item: ItemPost, user=Depends(UnionAuth(scopes=["rental.item.create"]))) -> ItemGet:
     """
-    Creates a new item.
+    Создает новый предмет.
 
-    Scopes: `["rental.item.create"]`
+    Перед созданием проверяется, существует ли тип предмета с указанным `type_id`.
+    После успешного создания действие логируется как `CREATE_ITEM`.
 
-    - **item**: The data for the new item.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на создание предметов
+    - Тип предмета с указанным `type_id` должен существовать
 
-    Returns the created item.
+    Скоупы:
+    - `rental.item.create`
 
-    Raises **ObjectNotFound** if the item type with the specified `type_id` is not found.
+    Параметры:
+    - `item` — данные нового предмета
+
+    Возвращает:
+    - созданный объект `Item`
+
+    Ошибки:
+    - `ObjectNotFound` — тип предмета с указанным `type_id` не найден
     """
     item_type = ItemType.get(item.type_id, session=db.session)
     if item_type is None:
@@ -65,16 +88,28 @@ async def update_item(
     user=Depends(UnionAuth(scopes=["rental.item.patch"])),
 ) -> ItemGet:
     """
-    Updates the availability status of an item by its ID.
+    Обновляет статус доступности предмета по его идентификатору.
 
-    Scopes: `["rental.item.patch"]`
+    Эндпоинт позволяет изменить только поле `is_available`.
+    После успешного обновления действие логируется как `UPDATE_ITEM`.
 
-    - **id**: The ID of the item.
-    - **is_available**: The new availability status for the item.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на изменение предметов
+    - Предмет с указанным `id` должен существовать
 
-    Returns the updated item.
+    Скоупы:
+    - `rental.item.patch`
 
-    Raises **ObjectNotFound** if the item with the specified ID is not found.
+    Параметры:
+    - `id` — идентификатор предмета
+    - `is_available` — новое значение доступности предмета
+
+    Возвращает:
+    - обновленный объект `Item`
+
+    Ошибки:
+    - `ObjectNotFound` — предмет с указанным `id` не найден
     """
     item = Item.query(session=db.session).filter(Item.id == id).one_or_none()
     if item is not None:
@@ -95,15 +130,34 @@ async def delete_item(
     id: int, user=Depends(UnionAuth(scopes=["rental.item.delete"], allow_none=False))
 ) -> StatusResponseModel:
     """
-    Deletes an item by its ID.
+    Удаляет предмет по его идентификатору.
 
-    Scopes: `["rental.item.delete"]`
+    Перед удалением проверяется, что с предметом не связано активных,
+    зарезервированных или просроченных сессий аренды.  
+    Если такие сессии существуют — удаление запрещено.
 
-    - **id**: The ID of the item.
+    При успешном удалении:
+    - удаляется сам предмет
+    - удаляются связанные сессии аренды (если они не помечены как удалённые)
+    - удаляются связанные страйки и события
+    - действие логируется как `DELETE_ITEM`
 
-    Returns a status response.
+    Условия:
+    - Пользователь должен быть аутентифицирован
+    - Пользователь должен иметь право на удаление предметов
+    - У предмета не должно быть сессий в статусах ACTIVE / RESERVED / OVERDUE
 
-    Raises **ObjectNotFound** if the item with the specified ID is not found.
+    Скоупы:
+    - `rental.item.delete`
+
+    Параметры:
+    - `id` — идентификатор предмета
+
+    Возвращает:
+    - объект `StatusResponseModel` со статусом удаления
+
+    Ошибки:
+    - `ObjectNotFound` — предмет не найден или удаление запрещено из-за активных сессий
     """
     rental_sessions = db.session.query(RentalSession).filter(RentalSession.item_id == id)
     session = rental_sessions.filter(
@@ -134,7 +188,22 @@ async def delete_item(
 @item.get("/{id}", response_model=ItemGet)
 async def get_item(id: int) -> ItemGet:
     """
-    Получает предмет по его идентификатору.
+    Возвращает предмет по его идентификатору.
+
+    Условия:
+    - отсутствуют (доступно без авторизации)
+
+    Скоупы:
+    - отсутствуют
+
+    Параметры:
+    - `id` — идентификатор предмета
+
+    Возвращает:
+    - объект `Item`
+
+    Ошибки:
+    - возможна ошибка валидации, если предмет с указанным `id` не найден
     """
     item = Item.get(id=id, session=db.session)
     return ItemGet.model_validate(item)
