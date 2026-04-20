@@ -26,7 +26,6 @@ from rental_backend.schemas.models import (
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
-
 settings: Settings = get_settings()
 rental_session = APIRouter(prefix="/rental-sessions", tags=["RentalSession"])
 
@@ -344,41 +343,41 @@ async def accept_end_rental_session(
     dependencies=[Depends(check_sessions_expiration), Depends(check_sessions_overdue)],
 )
 async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
-        """
-        Возвращает сессию аренды по её идентификатору.
+    """
+    Возвращает сессию аренды по её идентификатору.
 
-        Перед получением выполняется проверка истекших и просроченных сессий,
-        чтобы вернуть актуальное состояние данных. В ответ также включается
-        информация о страйке, если он привязан к данной сессии.
+    Перед получением выполняется проверка истекших и просроченных сессий,
+    чтобы вернуть актуальное состояние данных. В ответ также включается
+    информация о страйке, если он привязан к данной сессии.
 
-        Условия:
-        - Сессия должна существовать
+    Условия:
+    - Сессия должна существовать
 
-        Скоупы:
-        - `rental.session.admin`
+    Скоупы:
+    - `rental.session.admin`
 
-        Параметры:
-        - `session_id` — идентификатор сессии аренды
+    Параметры:
+    - `session_id` — идентификатор сессии аренды
 
-        Возвращает:
-        - объект `RentalSession` с данными о сессии и `strike_id`, если он есть
+    Возвращает:
+    - объект `RentalSession` с данными о сессии и `strike_id`, если он есть
 
-        Ошибки:
-        - `ObjectNotFound` — сессия не найдена
-        """
-        rental_session: RentalSession | None = (
+    Ошибки:
+    - `ObjectNotFound` — сессия не найдена
+    """
+    rental_session: RentalSession | None = (
         RentalSession.query(session=db.session)
         .options(joinedload(RentalSession.strike))
         .filter(RentalSession.id == session_id)
         .first()
     )
 
-        if not rental_session:
-            raise ObjectNotFound(RentalSession, session_id)
+    if not rental_session:
+        raise ObjectNotFound(RentalSession, session_id)
 
-        result: RentalSessionGet = RentalSessionGet.model_validate(rental_session)
-        result.strike_id = rental_session.strike.id if rental_session.strike else None
-        return result
+    result: RentalSessionGet = RentalSessionGet.model_validate(rental_session)
+    result.strike_id = rental_session.strike.id if rental_session.strike else None
+    return result
 
 
 async def get_rental_sessions_common(

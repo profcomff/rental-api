@@ -10,7 +10,6 @@ from rental_backend.schemas.models import ItemGet, ItemPost
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
-
 settings: Settings = get_settings()
 item = APIRouter(prefix="/item", tags=["Items"])
 
@@ -133,7 +132,7 @@ async def delete_item(
     Удаляет предмет по его идентификатору.
 
     Перед удалением проверяется, что с предметом не связано активных,
-    зарезервированных или просроченных сессий аренды.  
+    зарезервированных или просроченных сессий аренды.
     Если такие сессии существуют — удаление запрещено.
 
     При успешном удалении:
