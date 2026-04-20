@@ -344,32 +344,28 @@ async def accept_end_rental_session(
     dependencies=[Depends(check_sessions_expiration), Depends(check_sessions_overdue)],
 )
 async def get_rental_session(session_id: int, user=Depends(UnionAuth(scopes=["rental.session.admin"]))):
-<<<<<<< HEAD
-=======
-    """
-    Возвращает сессию аренды по её идентификатору.
+        """
+        Возвращает сессию аренды по её идентификатору.
 
-    Перед получением сессии выполняется проверка истекших и просроченных сессий, чтобы вернуть
-    актуальное состояние данных. В ответ также включается информация о страйке, если он привязан
-    к данной сессии.
+        Перед получением выполняется проверка истекших и просроченных сессий,
+        чтобы вернуть актуальное состояние данных. В ответ также включается
+        информация о страйке, если он привязан к данной сессии.
 
-    Условия:
-    - Сессия должна существовать
+        Условия:
+        - Сессия должна существовать
 
-    Скоупы:
-    - `rental.session.admin`
+        Скоупы:
+        - `rental.session.admin`
 
-    Параметры:
-    - `session_id` — идентификатор сессии аренды
+        Параметры:
+        - `session_id` — идентификатор сессии аренды
 
-    Возвращает:
-    - объект `RentalSession` с данными о сессии и `strike_id`, если для нее существует страйк
+        Возвращает:
+        - объект `RentalSession` с данными о сессии и `strike_id`, если он есть
 
-    Ошибки:
-    - `ObjectNotFound` — сессия с указанным id не найдена
-    """
-
->>>>>>> c46ad6f (updated swagger descriptions)
+        Ошибки:
+        - `ObjectNotFound` — сессия не найдена
+        """
     rental_session: RentalSession | None = (
         RentalSession.query(session=db.session)
         .options(joinedload(RentalSession.strike))
