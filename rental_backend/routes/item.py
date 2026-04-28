@@ -16,17 +16,30 @@ item = APIRouter(prefix="/item", tags=["Items"])
 
 
 @item.get("", response_model=list[ItemGet])
-async def get_items(type_id: int = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
+async def get_items(type_id: int = Query(None), order_by: str = Query("id"), order: str = Query("asc"), is_available: bool = Query(None), user=Depends(UnionAuth())) -> list[ItemGet]:
     """
     Retrieves a list of items. If `type_id` is specified, only items of that type are returned.
 
     - **type_id**: The ID of the item type (optional).
-
+    - **order_by**: Sort field (default: id).
+    - **order**: Sort direction: asc/desc.
+    
     Returns a list of items.
     """
     query = Item.query(session=db.session)
+
     if type_id is not None:
         query = query.filter(Item.type_id == type_id)
+
+    if is_available is not None:
+        query = query.filter(Item.is_available == is_available)
+    
+    column = getattr(Item, order_by, Item.id)
+    if order == "desc":
+        query = query.order_by(column.desc())
+    else:
+        query = query.order_by(column.asc())
+    
     items = query.all()
     return [ItemGet.model_validate(item) for item in items]
 
