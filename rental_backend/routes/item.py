@@ -1,3 +1,5 @@
+from typing import Literal
+
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
@@ -18,8 +20,8 @@ item = APIRouter(prefix="/item", tags=["Items"])
 @item.get("", response_model=list[ItemGet])
 async def get_items(
     type_id: int = Query(None),
-    order_by: str = Query("id"),
-    order: str = Query("asc"),
+    order_by: Literal["id", "type_id", "is_available"] | None = Query(None),
+    order: Literal["asc", "desc"] | None = Query(None),
     is_available: bool = Query(None),
     user=Depends(UnionAuth()),
 ) -> list[ItemGet]:
@@ -40,11 +42,12 @@ async def get_items(
     if is_available is not None:
         query = query.filter(Item.is_available == is_available)
 
-    column = getattr(Item, order_by, Item.id)
-    if order == "desc":
-        query = query.order_by(column.desc())
-    else:
-        query = query.order_by(column.asc())
+    if order_by is not None and order is not None:
+        column = getattr(Item, order_by, Item.id)
+        if order == "desc":
+            query = query.order_by(column.desc())
+        else:
+            query = query.order_by(column.asc())
 
     items = query.all()
     return [ItemGet.model_validate(item) for item in items]
