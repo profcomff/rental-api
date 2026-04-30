@@ -42,10 +42,11 @@ async def get_items(
     if is_available is not None:
         query = query.filter(Item.is_available == is_available)
 
-    column = getattr(Item, order_by, Item.id)
+    new_order = order_by if order_by is not None else "id"
+    column = getattr(Item, new_order)
     if order == "desc":
         query = query.order_by(column.desc())
-    elif order == "asc":
+    else:
         query = query.order_by(column.asc())
 
     items = query.all()
