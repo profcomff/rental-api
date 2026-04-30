@@ -23,15 +23,15 @@ async def get_items(
     order_by: Literal["id", "type_id", "is_available"] | None = Query(None),
     order: Literal["asc", "desc"] | None = Query(None),
     is_available: bool = Query(None),
-    user=Depends(UnionAuth()),
+    user = Depends(UnionAuth()),
 ) -> list[ItemGet]:
     """
     Retrieves a list of items. If `type_id` is specified, only items of that type are returned.
 
     - **type_id**: The ID of the item type (optional).
-    - **order_by**: Sort field (default: id).
-    - **order**: Sort direction: asc/desc.
-
+    - **order_by**: Sort field. Available values: id, type_id, is_available.
+    - **order**: Sort direction: asc (ascending), desc (descending). Works only if order_by is specified.
+    - **is_available**: true - available, false - unavailable. If not set - all items.
     Returns a list of items.
     """
     query = Item.query(session=db.session)
@@ -42,12 +42,11 @@ async def get_items(
     if is_available is not None:
         query = query.filter(Item.is_available == is_available)
 
-    if order_by is not None and order is not None:
-        column = getattr(Item, order_by, Item.id)
-        if order == "desc":
-            query = query.order_by(column.desc())
-        else:
-            query = query.order_by(column.asc())
+    column = getattr(Item, order_by, Item.id)
+    if order == "desc":
+        query = query.order_by(column.desc())
+    elif order == "asc":
+        query = query.order_by(column.asc())
 
     items = query.all()
     return [ItemGet.model_validate(item) for item in items]
