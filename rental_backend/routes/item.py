@@ -23,7 +23,7 @@ async def get_items(
     order_by: Literal["id", "type_id", "is_available"] | None = Query(None),
     order: Literal["asc", "desc"] | None = Query(None),
     is_available: bool = Query(None),
-    user = Depends(UnionAuth()),
+    user=Depends(UnionAuth()),
 ) -> list[ItemGet]:
     """
     Retrieves a list of items. If `type_id` is specified, only items of that type are returned.
