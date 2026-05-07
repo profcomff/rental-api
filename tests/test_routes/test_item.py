@@ -50,39 +50,42 @@ def test_get_item_id(client, dbsession, items_with_types, item_n, response_statu
     'item_n,response_status',
     [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK)],
 )
-def test_get_items_by_type_id(client, items_with_types, item_n, response_status): 
+def test_get_items_by_type_id(client, items_with_types, item_n, response_status):
     query = {"type_id": f'{items_with_types[item_n].type_id}'}
     response = client.get(f'{url}', params=query)
     assert response.status_code == response_status
 
+
 @pytest.mark.parametrize(
     "item_n, order_by, order, is_available, response_status",
-    [(0, None, None, True, status.HTTP_200_OK),
-     (0, "id", None, True, status.HTTP_200_OK),
-     (0, "type_id",	"asc",	False, status.HTTP_200_OK),
-     (0, "is_available", "desc", False, status.HTTP_200_OK),
-     (0, None, None, False, status.HTTP_200_OK),
-     (1, "id", "asc", False, status.HTTP_200_OK),
-     (1, "type_id", "desc", True, status.HTTP_200_OK),
-     (1, "is_available", None, True, status.HTTP_200_OK),
-     (1, None, "asc", True, status.HTTP_200_OK),
-     (0, "id", "desc", True, status.HTTP_200_OK),
-     (1, "type_id", None, False, status.HTTP_200_OK),
-     (0, "is_available", "asc", False, status.HTTP_200_OK),
-     (0, None, "desc", False, status.HTTP_200_OK),
-     (None, "id", None, True, status.HTTP_200_OK),
-     (None, "type_id", "asc", False, status.HTTP_200_OK),
-     (None, "is_available", "desc", False, status.HTTP_200_OK),
-     (None, "is_available", "desc", False, status.HTTP_200_OK),
-        ]
-    )
+    [
+        (0, None, None, True, status.HTTP_200_OK),
+        (0, "id", None, True, status.HTTP_200_OK),
+        (0, "type_id", "asc", False, status.HTTP_200_OK),
+        (0, "is_available", "desc", False, status.HTTP_200_OK),
+        (0, None, None, False, status.HTTP_200_OK),
+        (1, "id", "asc", False, status.HTTP_200_OK),
+        (1, "type_id", "desc", True, status.HTTP_200_OK),
+        (1, "is_available", None, True, status.HTTP_200_OK),
+        (1, None, "asc", True, status.HTTP_200_OK),
+        (0, "id", "desc", True, status.HTTP_200_OK),
+        (1, "type_id", None, False, status.HTTP_200_OK),
+        (0, "is_available", "asc", False, status.HTTP_200_OK),
+        (0, None, "desc", False, status.HTTP_200_OK),
+        (None, "id", None, True, status.HTTP_200_OK),
+        (None, "type_id", "asc", False, status.HTTP_200_OK),
+        (None, "is_available", "desc", False, status.HTTP_200_OK),
+        (None, "is_available", "desc", False, status.HTTP_200_OK),
+    ],
+)
 def test_get_items_positive_cases(client, items_with_types, item_n, order_by, order, is_available, response_status):
-    dict_of_params = {"type_id" : items_with_types[item_n].type_id if item_n is not None else None,
-                      "order_by" : order_by,
-                      "order" : order,
-                      "is_availible" : str(is_available).lower() if is_available is not None else None
-                      }
-    query = {k : v for k, v in dict_of_params.items() if v is not None}
+    dict_of_params = {
+        "type_id": items_with_types[item_n].type_id if item_n is not None else None,
+        "order_by": order_by,
+        "order": order,
+        "is_availible": str(is_available).lower() if is_available is not None else None,
+    }
+    query = {k: v for k, v in dict_of_params.items() if v is not None}
     response = client.get(url, params=query)
     assert response.status_code == response_status
     data = response.json()
@@ -95,22 +98,23 @@ def test_get_items_positive_cases(client, items_with_types, item_n, order_by, or
 
 @pytest.mark.parametrize(
     "item_n, order_by, order, response_status",
-    [(None, None, "desc", status.HTTP_200_OK),
-     (0, None, "desc", status.HTTP_200_OK),
-     ]
-        )
+    [
+        (None, None, "desc", status.HTTP_200_OK),
+        (0, None, "desc", status.HTTP_200_OK),
+    ],
+)
 def test_get_items_check_desc_order_by_id(client, items_with_different_types, item_n, order_by, order, response_status):
-    dict_of_params = {"type_id" : items_with_different_types[item_n].type_id if item_n is not None else None,
-                      "order_by" : order_by,
-                      "order" : order,
-                      }
-    pytest.set_trace()
-    query = {k : v for k, v in dict_of_params.items() if v is not None}
+    dict_of_params = {
+        "type_id": items_with_different_types[item_n].type_id if item_n is not None else None,
+        "order_by": order_by,
+        "order": order,
+    }
+    query = {k: v for k, v in dict_of_params.items() if v is not None}
     response = client.get(url, params=query)
     assert response.status_code == response_status
 
     data = response.json()
-    
+
     key = lambda x: x["id"]
     compare = lambda x, y: x >= y
     assert all(compare(key(x), key(y)) for x, y in zip(data, data[1:])) is True
@@ -118,46 +122,54 @@ def test_get_items_check_desc_order_by_id(client, items_with_different_types, it
 
 @pytest.mark.parametrize(
     "item_n, order_by, order, response_status",
-     [(None, "type_id", "desc", status.HTTP_200_OK),
-     (1, "type_id", "desc", status.HTTP_200_OK),
-     ]
-        )
-def test_get_items_check_desc_order_by_type_id(client, items_with_different_types, item_n, order_by, order, response_status):
-    dict_of_params = {"type_id" : items_with_different_types[item_n].type_id if item_n is not None else None,
-                      "order_by" : order_by,
-                      "order" : order,
-                      }
-    query = {k : v for k, v in dict_of_params.items() if v is not None}
+    [
+        (None, "type_id", "desc", status.HTTP_200_OK),
+        (1, "type_id", "desc", status.HTTP_200_OK),
+    ],
+)
+def test_get_items_check_desc_order_by_type_id(
+    client, items_with_different_types, item_n, order_by, order, response_status
+):
+    dict_of_params = {
+        "type_id": items_with_different_types[item_n].type_id if item_n is not None else None,
+        "order_by": order_by,
+        "order": order,
+    }
+    query = {k: v for k, v in dict_of_params.items() if v is not None}
     response = client.get(url, params=query)
     assert response.status_code == response_status
 
     data = response.json()
-    
+
     key = lambda x: x["type_id"]
     compare = lambda x, y: x >= y
     assert all(compare(key(x), key(y)) for x, y in zip(data, data[1:])) is True
 
+
 @pytest.mark.parametrize(
     "item_n, order_by, order, response_status",
-     [(None, "is_available", "desc", status.HTTP_200_OK),
-     (1, "is_available", "desc", status.HTTP_200_OK),
-     ]
-        )
-def test_get_items_check_desc_order_by_is_available(client, items_with_different_types, item_n, order_by, order, response_status):
-    dict_of_params = {"type_id" : items_with_different_types[item_n].type_id if item_n is not None else None,
-                      "order_by" : order_by,
-                      "order" : order,
-                      }
-    query = {k : v for k, v in dict_of_params.items() if v is not None}
+    [
+        (None, "is_available", "desc", status.HTTP_200_OK),
+        (1, "is_available", "desc", status.HTTP_200_OK),
+    ],
+)
+def test_get_items_check_desc_order_by_is_available(
+    client, items_with_different_types, item_n, order_by, order, response_status
+):
+    dict_of_params = {
+        "type_id": items_with_different_types[item_n].type_id if item_n is not None else None,
+        "order_by": order_by,
+        "order": order,
+    }
+    query = {k: v for k, v in dict_of_params.items() if v is not None}
     response = client.get(url, params=query)
     assert response.status_code == response_status
 
     data = response.json()
-    
+
     key = lambda x: x["is_available"]
     compare = lambda x, y: x >= y
     assert all(compare(key(x), key(y)) for x, y in zip(data, data[1:])) is True
-
 
 
 @pytest.mark.parametrize(

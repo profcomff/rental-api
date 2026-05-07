@@ -278,10 +278,11 @@ def items_with_types(dbsession):
     dbsession.commit()
     yield items
 
+
 @pytest.fixture()
 def items_with_different_types(dbsession):
     """Фикстура Item.
-    
+
     .. note::
         Фикстура создает 6 item. Каждые 2 с одинаковым типом и разными значениями is_available.
     """
@@ -307,7 +308,6 @@ def items_with_different_types(dbsession):
         dbsession.add(item)
     dbsession.commit()
     yield items
-
 
 
 @pytest.fixture()
