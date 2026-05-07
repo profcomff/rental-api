@@ -23,3 +23,5 @@ def test_stairway_upgrade_downgrade(rev):
     subprocess.check_call(["alembic", "downgrade", "-1"])
     # upgrade обратно
     subprocess.check_call(["alembic", "upgrade", rev])
+    # возвращаем базу к последней миграции
+    subprocess.check_call(["alembic", "upgrade", "head"])
