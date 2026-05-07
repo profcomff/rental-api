@@ -278,6 +278,37 @@ def items_with_types(dbsession):
     dbsession.commit()
     yield items
 
+@pytest.fixture()
+def items_with_different_types(dbsession):
+    """Фикстура Item.
+    
+    .. note::
+        Фикстура создает 6 item. Каждые 2 с одинаковым типом и разными значениями is_available.
+    """
+
+    item_types = [
+        ItemType(name="Type1"),
+        ItemType(name="Type2"),
+        ItemType(name="Type3"),
+    ]
+    for item_type in item_types:
+        dbsession.add(item_type)
+    dbsession.commit()
+
+    items = [
+        Item(type_id=item_types[0].id, is_available=True),
+        Item(type_id=item_types[0].id, is_available=False),
+        Item(type_id=item_types[1].id, is_available=True),
+        Item(type_id=item_types[1].id, is_available=False),
+        Item(type_id=item_types[2].id, is_available=True),
+        Item(type_id=item_types[2].id, is_available=False),
+    ]
+    for item in items:
+        dbsession.add(item)
+    dbsession.commit()
+    yield items
+
+
 
 @pytest.fixture()
 def items_with_same_type_id(dbsession):
@@ -338,6 +369,7 @@ def blocking_session(request, dbsession, two_available_items_same_type, authlib_
     items[0].is_available = False
     dbsession.add(session, items[0])
     dbsession.commit()
+
     return item_type
 
 
