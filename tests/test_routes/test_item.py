@@ -78,7 +78,9 @@ def test_get_items_by_type_id(client, items_with_types, item_n, response_status)
         (-1, None, "desc", None, status.HTTP_200_OK, 6),
     ],
 )
-def test_get_items_by_various_filters(client, items_with_different_types, item_n, order_by, order, is_available, response_status, expected_len):
+def test_get_items_by_various_filters(
+    client, items_with_different_types, item_n, order_by, order, is_available, response_status, expected_len
+):
     dict_of_params = {
         "type_id": items_with_different_types[item_n].type_id if item_n != -1 else None,
         "order_by": order_by,
