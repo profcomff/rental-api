@@ -12,7 +12,6 @@ from rental_backend.schemas.models import ItemGet, ItemPost
 from rental_backend.settings import Settings, get_settings
 from rental_backend.utils.action import ActionLogger
 
-
 settings: Settings = get_settings()
 item = APIRouter(prefix="/item", tags=["Items"])
 
