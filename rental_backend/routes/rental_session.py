@@ -369,7 +369,10 @@ async def get_rental_sessions_common(
             RentStatus.RETURNED: 7,
         }
     status_order = case(status_to_show, value=RentalSession.status)
-    query = query.order_by(status_order, RentalSession.reservation_ts.desc())
+    if to_show == [RentStatus.RETURNED]:
+        query = query.order_by(status_order, RentalSession.end_ts.desc())
+    else:
+        query = query.order_by(status_order, RentalSession.reservation_ts.desc())
 
     if user_id != 0:
         query = query.filter(RentalSession.user_id == user_id)
